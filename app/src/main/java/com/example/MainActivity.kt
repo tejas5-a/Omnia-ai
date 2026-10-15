@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import com.example.data.local.AppDatabase
+import com.example.data.local.SecurePreferencesManager
 import com.example.data.repository.*
 import com.example.ui.components.DrawerContent
 import com.example.ui.screens.agents.AgentsScreen
@@ -41,14 +42,18 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Database & Secure Singletons
         val database = AppDatabase.getInstance(applicationContext)
+        val securePrefs = SecurePreferencesManager(applicationContext)
+        val appPrefs = AppPreferencesRepository(applicationContext)
+
         val chatRepository = ChatRepository(database.chatDao())
-        val providerRepository = ProviderRepository(database.providerDao())
+        val providerRepository = ProviderRepository(database.providerDao(), securePrefs, appPrefs)
         val agentRepository = AgentRepository(database.agentTaskDao())
         val memoryRepository = MemoryRepository(database.memoryDao())
 
         setContent {
-            val settingsViewModel = remember { SettingsViewModel(chatRepository, providerRepository) }
+            val settingsViewModel = remember { SettingsViewModel(chatRepository, providerRepository, appPrefs) }
             val settingsState by settingsViewModel.uiState.collectAsState()
 
             OmniaMaxTheme(darkTheme = settingsState.darkThemeEnabled) {
@@ -56,8 +61,8 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    val chatViewModel = remember { ChatViewModel(chatRepository, providerRepository) }
-                    val providersViewModel = remember { ProvidersViewModel(providerRepository) }
+                    val chatViewModel = remember { ChatViewModel(chatRepository, providerRepository, appPrefs) }
+                    val providersViewModel = remember { ProvidersViewModel(providerRepository, appPrefs) }
                     val agentsViewModel = remember { AgentsViewModel(agentRepository, providerRepository) }
                     val compareViewModel = remember { CompareViewModel(providerRepository) }
                     val workflowViewModel = remember { WorkflowViewModel(providerRepository) }

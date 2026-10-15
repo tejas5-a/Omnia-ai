@@ -3,9 +3,11 @@ package com.example.ui.screens.chat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.model.*
+import com.example.data.repository.AppPreferencesRepository
 import com.example.data.repository.ChatRepository
 import com.example.data.repository.ProviderRepository
 import com.example.engine.LLMProviderManager
+import com.example.engine.LLMRouter
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -25,7 +27,8 @@ data class ChatUiState(
 
 class ChatViewModel(
     private val chatRepository: ChatRepository,
-    private val providerRepository: ProviderRepository
+    private val providerRepository: ProviderRepository,
+    private val appPrefs: AppPreferencesRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -38,15 +41,28 @@ class ChatViewModel(
         viewModelScope.launch {
             providerRepository.initializeDefaultProviders()
 
-            // Observe providers
-            providerRepository.allProviders.collect { providers ->
-                val active = providers.firstOrNull { it.enabled } ?: providers.firstOrNull()
+            // Observe providers and user preferences
+            combine(providerRepository.allProviders, appPrefs.userPreferences) { providers, prefs ->
+                val active = providers.firstOrNull { it.id == prefs.activeProviderId }
+                    ?: providers.firstOrNull { it.enabled }
+                    ?: providers.firstOrNull()
+
+                Pair(active, prefs)
+            }.collect { (active, prefs) ->
                 if (active != null) {
+                    val filteredModels = if (prefs.isFreeModelsOnly) {
+                        active.fetchedModels.filter { it.isFreeTier }
+                            .ifEmpty { active.fetchedModels }
+                    } else {
+                        active.fetchedModels
+                    }
+
                     _uiState.update {
                         it.copy(
                             activeProvider = active,
-                            availableModels = active.fetchedModels,
-                            selectedModelId = active.selectedModel
+                            availableModels = filteredModels,
+                            selectedModelId = prefs.selectedModelId,
+                            isHighThinking = prefs.isHighThinking
                         )
                     }
                 }
@@ -57,7 +73,9 @@ class ChatViewModel(
         viewModelScope.launch {
             chatRepository.allThreads.collect { threads ->
                 if (threads.isEmpty()) {
-                    val newT = chatRepository.createNewThread()
+                    val newT = chatRepository.createNewThread(
+                        modelId = appPrefs.userPreferences.value.selectedModelId
+                    )
                     selectThread(newT.id)
                 } else {
                     val currentActive = _uiState.value.activeThread
@@ -96,6 +114,7 @@ class ChatViewModel(
                         isHighThinking = thread.isHighThinking
                     )
                 }
+                appPrefs.updateSelectedModelId(thread.modelId)
                 observeMessagesForThread(threadId)
             }
         }
@@ -104,8 +123,9 @@ class ChatViewModel(
     fun createNewThread() {
         viewModelScope.launch {
             val provider = providerRepository.getActiveProvider()
+            val currentModel = appPrefs.userPreferences.value.selectedModelId
             val newThread = chatRepository.createNewThread(
-                modelId = provider.selectedModel,
+                modelId = currentModel,
                 providerType = provider.type
             )
             selectThread(newThread.id)
@@ -127,7 +147,6 @@ class ChatViewModel(
             )
             chatRepository.saveMessage(userMsg)
 
-            // Update title if it's the first user message
             if (_uiState.value.messages.isEmpty() || activeThread.title == "New Conversation") {
                 val title = if (promptText.length > 30) promptText.take(28) + "..." else promptText
                 chatRepository.renameThread(activeThread.id, title)
@@ -211,6 +230,7 @@ class ChatViewModel(
         viewModelScope.launch {
             val updated = activeThread.copy(modelId = modelId)
             chatRepository.saveThread(updated)
+            appPrefs.updateSelectedModelId(modelId)
             _uiState.update { it.copy(activeThread = updated, selectedModelId = modelId) }
         }
     }
@@ -220,6 +240,7 @@ class ChatViewModel(
         viewModelScope.launch {
             val updated = activeThread.copy(isHighThinking = enabled)
             chatRepository.saveThread(updated)
+            appPrefs.updateHighThinking(enabled)
             _uiState.update { it.copy(activeThread = updated, isHighThinking = enabled) }
         }
     }

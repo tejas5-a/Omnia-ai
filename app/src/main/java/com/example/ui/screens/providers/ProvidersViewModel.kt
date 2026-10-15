@@ -2,11 +2,11 @@ package com.example.ui.screens.providers
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.data.model.AIModel
 import com.example.data.model.ConnectionStatus
 import com.example.data.model.ProviderConfig
-import com.example.data.model.ProviderType
+import com.example.data.repository.AppPreferencesRepository
 import com.example.data.repository.ProviderRepository
+import com.example.engine.LLMProviderManager
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -15,25 +15,49 @@ data class ProvidersUiState(
     val loadingProviderId: String? = null,
     val selectedProviderForEdit: ProviderConfig? = null,
     val editDialogOpen: Boolean = false,
-    val statusMessage: String? = null
+    val manualModelDialogOpen: Boolean = false,
+    val manualModelProvider: ProviderConfig? = null,
+    val isFreeModelsOnly: Boolean = false,
+    val statusMessage: String? = null,
+    val errorMessage: String? = null
 )
 
-class ProvidersViewModel(private val providerRepository: ProviderRepository) : ViewModel() {
+class ProvidersViewModel(
+    private val providerRepository: ProviderRepository,
+    private val appPrefs: AppPreferencesRepository
+) : ViewModel() {
 
     private val _uiState = MutableStateFlow(ProvidersUiState())
     val uiState: StateFlow<ProvidersUiState> = _uiState.asStateFlow()
 
+    private val llmManager = LLMProviderManager { providerRepository.getActiveProvider() }
+
     init {
         viewModelScope.launch {
             providerRepository.initializeDefaultProviders()
-            providerRepository.allProviders.collect { list ->
-                _uiState.update { it.copy(providers = list) }
+
+            // Combine provider data with user preferences
+            combine(providerRepository.allProviders, appPrefs.userPreferences) { providersList, prefs ->
+                Pair(providersList, prefs)
+            }.collect { (providersList, prefs) ->
+                _uiState.update {
+                    it.copy(
+                        providers = providersList,
+                        isFreeModelsOnly = prefs.isFreeModelsOnly
+                    )
+                }
             }
         }
     }
 
     fun fetchModelsForProvider(provider: ProviderConfig) {
-        _uiState.update { it.copy(loadingProviderId = provider.id, statusMessage = "Fetching models from ${provider.name} API...") }
+        _uiState.update {
+            it.copy(
+                loadingProviderId = provider.id,
+                statusMessage = "Fetching active models from ${provider.name}...",
+                errorMessage = null
+            )
+        }
 
         viewModelScope.launch {
             try {
@@ -41,14 +65,16 @@ class ProvidersViewModel(private val providerRepository: ProviderRepository) : V
                 _uiState.update {
                     it.copy(
                         loadingProviderId = null,
-                        statusMessage = "Successfully fetched ${fetched.size} models for ${provider.name}!"
+                        statusMessage = "Successfully retrieved ${fetched.size} verified models for ${provider.name}!",
+                        errorMessage = null
                     )
                 }
             } catch (e: Exception) {
                 _uiState.update {
                     it.copy(
                         loadingProviderId = null,
-                        statusMessage = "Fetch failed: ${e.localizedMessage}"
+                        statusMessage = null,
+                        errorMessage = "Fetch Failed: ${e.localizedMessage}"
                     )
                 }
             }
@@ -59,19 +85,20 @@ class ProvidersViewModel(private val providerRepository: ProviderRepository) : V
         viewModelScope.launch {
             val updated = provider.copy(selectedModel = modelId)
             providerRepository.saveProvider(updated)
+            appPrefs.updateSelectedModelId(modelId)
+            _uiState.update { it.copy(statusMessage = "Active model set to: $modelId") }
         }
+    }
+
+    fun toggleFreeModelsOnly(enabled: Boolean) {
+        appPrefs.updateFreeModelsOnly(enabled)
     }
 
     fun toggleProviderEnabled(provider: ProviderConfig, enabled: Boolean) {
         viewModelScope.launch {
-            // Disable all other providers if enabling this one
             if (enabled) {
                 _uiState.value.providers.forEach { p ->
-                    if (p.id == provider.id) {
-                        providerRepository.saveProvider(p.copy(enabled = true))
-                    } else {
-                        providerRepository.saveProvider(p.copy(enabled = false))
-                    }
+                    providerRepository.saveProvider(p.copy(enabled = p.id == provider.id))
                 }
             } else {
                 providerRepository.saveProvider(provider.copy(enabled = false))
@@ -85,6 +112,14 @@ class ProvidersViewModel(private val providerRepository: ProviderRepository) : V
 
     fun closeEditDialog() {
         _uiState.update { it.copy(editDialogOpen = false, selectedProviderForEdit = null) }
+    }
+
+    fun openManualModelDialog(provider: ProviderConfig) {
+        _uiState.update { it.copy(manualModelProvider = provider, manualModelDialogOpen = true) }
+    }
+
+    fun closeManualModelDialog() {
+        _uiState.update { it.copy(manualModelDialogOpen = false, manualModelProvider = null) }
     }
 
     fun saveProviderDetails(
@@ -103,6 +138,16 @@ class ProvidersViewModel(private val providerRepository: ProviderRepository) : V
             )
             providerRepository.saveProvider(updated)
             closeEditDialog()
+            _uiState.update { it.copy(statusMessage = "Updated credentials for $name.") }
+        }
+    }
+
+    fun saveManualModelId(provider: ProviderConfig, customModelId: String) {
+        if (customModelId.isBlank()) return
+        viewModelScope.launch {
+            providerRepository.addManualModel(provider, customModelId.trim())
+            closeManualModelDialog()
+            _uiState.update { it.copy(statusMessage = "Manually added model ID '$customModelId' and set as active.") }
         }
     }
 }
