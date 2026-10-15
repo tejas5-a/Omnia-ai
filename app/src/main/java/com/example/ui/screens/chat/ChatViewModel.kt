@@ -7,8 +7,8 @@ import com.example.data.repository.AppPreferencesRepository
 import com.example.data.repository.ChatRepository
 import com.example.data.repository.ProviderRepository
 import com.example.engine.LLMProviderManager
-import com.example.engine.LLMRouter
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -41,7 +41,6 @@ class ChatViewModel(
         viewModelScope.launch {
             providerRepository.initializeDefaultProviders()
 
-            // Observe providers and user preferences
             combine(providerRepository.allProviders, appPrefs.userPreferences) { providers, prefs ->
                 val active = providers.firstOrNull { it.id == prefs.activeProviderId }
                     ?: providers.firstOrNull { it.enabled }
@@ -69,7 +68,6 @@ class ChatViewModel(
             }
         }
 
-        // Observe chat threads
         viewModelScope.launch {
             chatRepository.allThreads.collect { threads ->
                 if (threads.isEmpty()) {
@@ -98,7 +96,10 @@ class ChatViewModel(
     private fun observeMessagesForThread(threadId: String) {
         viewModelScope.launch {
             chatRepository.getMessagesForThread(threadId).collect { msgs ->
-                _uiState.update { it.copy(messages = msgs) }
+                // Don't overwrite active in-memory streaming message
+                if (!_uiState.value.isGenerating) {
+                    _uiState.update { it.copy(messages = msgs) }
+                }
             }
         }
     }
@@ -135,9 +136,16 @@ class ChatViewModel(
     fun sendMessage(promptText: String, attachments: List<Attachment> = emptyList()) {
         if (promptText.isBlank() && attachments.isEmpty()) return
 
-        val activeThread = _uiState.value.activeThread ?: return
-
         viewModelScope.launch {
+            // Ensure thread exists
+            var activeThread = _uiState.value.activeThread
+            if (activeThread == null) {
+                activeThread = chatRepository.createNewThread(
+                    modelId = appPrefs.userPreferences.value.selectedModelId
+                )
+                _uiState.update { it.copy(activeThread = activeThread) }
+            }
+
             val userMsg = ChatMessage(
                 threadId = activeThread.id,
                 sender = MessageSender.USER,
@@ -169,18 +177,23 @@ class ChatViewModel(
                 content = "",
                 status = MessageStatus.STREAMING
             )
-            chatRepository.saveMessage(assistantMsg)
 
-            val currentMsgs = chatRepository.getMessagesForThread(thread.id).first()
-                .filter { it.id != assistantMsgId }
+            // Append assistant message in UI state immediately
+            val currentList = _uiState.value.messages.toMutableList()
+            currentList.add(assistantMsg)
+            _uiState.update { it.copy(messages = currentList) }
 
+            val historyForModel = currentList.filter { it.id != assistantMsgId && it.status == MessageStatus.SUCCESS }
             val fullAccumulatedText = StringBuilder()
+            var lastSaveTime = System.currentTimeMillis()
 
             try {
+                val effectiveModel = if (thread.modelId.isNotBlank()) thread.modelId else appPrefs.userPreferences.value.selectedModelId
+
                 llmManager.streamResponse(
-                    messages = currentMsgs,
+                    messages = historyForModel,
                     systemInstruction = thread.systemInstruction,
-                    overrideModelId = thread.modelId,
+                    overrideModelId = effectiveModel,
                     isHighThinking = thread.isHighThinking
                 ).collect { chunk ->
                     fullAccumulatedText.append(chunk)
@@ -188,21 +201,54 @@ class ChatViewModel(
                         content = fullAccumulatedText.toString(),
                         status = MessageStatus.STREAMING
                     )
-                    chatRepository.saveMessage(assistantMsg)
+
+                    // Update UI State in memory
+                    val updatedList = _uiState.value.messages.map { msg ->
+                        if (msg.id == assistantMsgId) assistantMsg else msg
+                    }
+                    _uiState.update { it.copy(messages = updatedList) }
+
+                    // Periodically throttle DB save (every 250ms) to prevent Room flow re-creation
+                    val now = System.currentTimeMillis()
+                    if (now - lastSaveTime > 250) {
+                        lastSaveTime = now
+                        chatRepository.saveMessage(assistantMsg)
+                    }
                 }
 
-                assistantMsg = assistantMsg.copy(
-                    content = fullAccumulatedText.toString(),
-                    status = MessageStatus.SUCCESS
-                )
+                val finalOutput = fullAccumulatedText.toString().trim()
+                if (finalOutput.isEmpty()) {
+                    assistantMsg = assistantMsg.copy(
+                        status = MessageStatus.ERROR,
+                        errorMessage = "Model returned empty response. Please check model ID or API key."
+                    )
+                    _uiState.update { it.copy(errorText = assistantMsg.errorMessage) }
+                } else {
+                    assistantMsg = assistantMsg.copy(
+                        content = finalOutput,
+                        status = MessageStatus.SUCCESS
+                    )
+                }
+
+                // Final commit to Room DB
                 chatRepository.saveMessage(assistantMsg)
+
+                val finalList = _uiState.value.messages.map { msg ->
+                    if (msg.id == assistantMsgId) assistantMsg else msg
+                }
+                _uiState.update { it.copy(messages = finalList) }
+
             } catch (e: Exception) {
                 assistantMsg = assistantMsg.copy(
                     status = MessageStatus.ERROR,
                     errorMessage = e.localizedMessage ?: "Generation failed"
                 )
                 chatRepository.saveMessage(assistantMsg)
-                _uiState.update { it.copy(errorText = e.localizedMessage) }
+
+                val finalList = _uiState.value.messages.map { msg ->
+                    if (msg.id == assistantMsgId) assistantMsg else msg
+                }
+                _uiState.update { it.copy(messages = finalList, errorText = e.localizedMessage) }
             } finally {
                 _uiState.update { it.copy(isGenerating = false) }
             }

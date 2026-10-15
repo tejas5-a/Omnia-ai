@@ -11,9 +11,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,7 +27,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -41,7 +38,6 @@ import com.example.data.model.MessageSender
 import com.example.data.model.MessageStatus
 import com.example.ui.components.MarkdownText
 import com.example.ui.components.ModelSelectorHeader
-import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -53,26 +49,41 @@ fun ChatScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
     var inputText by remember { mutableStateOf("") }
     val attachedImages = remember { mutableStateListOf<Attachment>() }
-
     var systemInstructionText by remember { mutableStateOf("") }
 
     LaunchedEffect(uiState.activeThread) {
         systemInstructionText = uiState.activeThread?.systemInstruction ?: ""
     }
 
-    // Auto-scroll to bottom on new messages
-    LaunchedEffect(uiState.messages.size, uiState.messages.lastOrNull()?.content?.length) {
-        if (uiState.messages.isNotEmpty()) {
-            listState.animateScrollToItem(uiState.messages.size - 1)
+    val isUserAtBottom by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val totalItems = layoutInfo.totalItemsCount
+            if (totalItems <= 1) true
+            else {
+                val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                lastVisibleIndex >= totalItems - 2
+            }
         }
     }
 
-    // Photo picker for attachments
+    LaunchedEffect(uiState.messages.size) {
+        if (uiState.messages.isNotEmpty()) {
+            listState.scrollToItem(uiState.messages.size - 1)
+        }
+    }
+
+    val lastMessageLength = uiState.messages.lastOrNull()?.content?.length ?: 0
+    LaunchedEffect(lastMessageLength) {
+        if (isUserAtBottom && uiState.messages.isNotEmpty()) {
+            listState.scrollToItem(uiState.messages.size - 1)
+        }
+    }
+
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri: Uri? ->
@@ -81,7 +92,7 @@ fun ChatScreen(
                 val inputStream = context.contentResolver.openInputStream(uri)
                 val bitmap = BitmapFactory.decodeStream(inputStream)
                 val outputStream = ByteArrayOutputStream()
-                bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, outputStream)
+                bitmap?.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, outputStream)
                 val base64 = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
 
                 attachedImages.add(
@@ -135,7 +146,6 @@ fun ChatScreen(
                 .padding(innerPadding)
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Active Model & Thinking Mode Header Bar
             uiState.activeProvider?.let { provider ->
                 ModelSelectorHeader(
                     activeProvider = provider,
@@ -148,7 +158,6 @@ fun ChatScreen(
                 )
             }
 
-            // Message History Feed
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -157,9 +166,7 @@ fun ChatScreen(
                 if (uiState.messages.isEmpty()) {
                     EmptyChatWelcomeView(
                         activeModelId = uiState.selectedModelId,
-                        onPromptSuggested = { prompt ->
-                            inputText = prompt
-                        }
+                        onPromptSuggested = { prompt -> inputText = prompt }
                     )
                 } else {
                     LazyColumn(
@@ -184,7 +191,6 @@ fun ChatScreen(
                 }
             }
 
-            // Attached Images Row Preview
             if (attachedImages.isNotEmpty()) {
                 Row(
                     modifier = Modifier
@@ -223,7 +229,6 @@ fun ChatScreen(
                 }
             }
 
-            // Bottom Chat Input Container
             Surface(
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 4.dp,
@@ -235,7 +240,6 @@ fun ChatScreen(
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Attachment Picker Button
                     IconButton(
                         onClick = {
                             photoPickerLauncher.launch(
@@ -251,7 +255,6 @@ fun ChatScreen(
                         )
                     }
 
-                    // Text Field Input
                     OutlinedTextField(
                         value = inputText,
                         onValueChange = { inputText = it },
@@ -265,7 +268,6 @@ fun ChatScreen(
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    // Send or Stop Button
                     if (uiState.isGenerating) {
                         IconButton(
                             onClick = { viewModel.stopGeneration() },
@@ -314,7 +316,6 @@ fun ChatScreen(
         }
     }
 
-    // System Instructions Bottom Sheet Dialog
     if (uiState.systemPromptSheetOpen) {
         ModalBottomSheet(
             onDismissRequest = { viewModel.setSystemPromptSheetOpen(false) }
@@ -381,7 +382,6 @@ fun ChatMessageBubble(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
     ) {
-        // Sender Label
         Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(bottom = 4.dp)
@@ -394,7 +394,6 @@ fun ChatMessageBubble(
             )
         }
 
-        // Bubble Surface
         Surface(
             color = if (isUser) MaterialTheme.colorScheme.primaryContainer
             else MaterialTheme.colorScheme.surfaceVariant,
@@ -431,8 +430,7 @@ fun ChatMessageBubble(
                     )
                 }
 
-                // Action Bar for Assistant Messages
-                if (!isUser && message.status == MessageStatus.SUCCESS) {
+                if (!isUser && (message.status == MessageStatus.SUCCESS || message.content.isNotEmpty())) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         horizontalArrangement = Arrangement.End,

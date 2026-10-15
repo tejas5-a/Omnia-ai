@@ -1,5 +1,6 @@
 package com.example.data.remote
 
+import android.util.Log
 import com.example.data.model.ChatMessage
 import com.example.data.model.MessageSender
 import com.example.data.model.ProviderConfig
@@ -16,6 +17,8 @@ import org.json.JSONObject
 
 object LLMStreamService {
 
+    private const val TAG = "LLMStreamService"
+
     fun generateStream(
         provider: ProviderConfig,
         modelId: String,
@@ -24,21 +27,25 @@ object LLMStreamService {
         isHighThinking: Boolean = false
     ): Flow<String> = flow {
         val client = ApiClient.okHttpClient
+        val startTime = System.currentTimeMillis()
+        var chunkCount = 0
+        var firstChunkTime = -1L
+
+        val effectiveModelId = modelId.ifBlank { provider.selectedModel }
+        Log.d(TAG, "Starting stream request for provider=${provider.name}, type=${provider.type}, model=$effectiveModelId")
 
         when (provider.type) {
             ProviderType.GEMINI -> {
                 val apiKey = provider.apiKey.ifBlank { com.example.BuildConfig.GEMINI_API_KEY }
                 if (apiKey.isBlank()) {
-                    emit("Error: Gemini API key is missing. Please configure your API key in the Secrets panel or Provider Hub.")
+                    emit("Error: Gemini API key is missing. Please configure your key in settings.")
                     return@flow
                 }
 
-                val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelId:streamGenerateContent?alt=sse&key=$apiKey"
+                val url = "https://generativelanguage.googleapis.com/v1beta/models/$effectiveModelId:streamGenerateContent?alt=sse&key=$apiKey"
 
-                // Construct Gemini REST Payload
                 val requestJson = JSONObject()
 
-                // System Instruction
                 if (systemInstruction.isNotBlank()) {
                     val sysObj = JSONObject()
                     val sysParts = JSONArray()
@@ -47,7 +54,6 @@ object LLMStreamService {
                     requestJson.put("systemInstruction", sysObj)
                 }
 
-                // High Thinking Level support for gemini-4-argon / gemini thinking models
                 if (isHighThinking) {
                     val genConfig = JSONObject()
                     val thinkingConfig = JSONObject().put("thinkingLevel", "HIGH")
@@ -55,7 +61,6 @@ object LLMStreamService {
                     requestJson.put("generationConfig", genConfig)
                 }
 
-                // Contents history
                 val contentsArray = JSONArray()
                 for (msg in messages) {
                     val role = if (msg.sender == MessageSender.USER) "user" else "model"
@@ -63,14 +68,12 @@ object LLMStreamService {
                     contentObj.put("role", role)
                     val partsArray = JSONArray()
 
-                    // Text part
                     if (msg.content.isNotBlank()) {
                         partsArray.put(JSONObject().put("text", msg.content))
                     }
 
-                    // Attachments (Image Inline Data)
                     for (att in msg.attachments) {
-                        if (att.base64Data != null) {
+                        if (!att.base64Data.isNullOrBlank()) {
                             val inlineData = JSONObject()
                             inlineData.put("mimeType", att.mimeType)
                             inlineData.put("data", att.base64Data)
@@ -89,6 +92,8 @@ object LLMStreamService {
                 val request = Request.Builder().url(url).post(body).build()
 
                 val response = client.newCall(request).execute()
+                Log.d(TAG, "Gemini HTTP response status: ${response.code}")
+
                 if (!response.isSuccessful) {
                     val errBody = response.body?.string() ?: ""
                     emit("Error (${response.code}): $errBody")
@@ -119,13 +124,15 @@ object LLMStreamService {
                                     val part = parts.getJSONObject(i)
                                     val text = part.optString("text", "")
                                     if (text.isNotEmpty()) {
+                                        if (firstChunkTime < 0) firstChunkTime = System.currentTimeMillis() - startTime
+                                        chunkCount++
                                         emit(text)
                                     }
                                 }
                             }
                         }
                     } catch (e: Exception) {
-                        // Ignore chunk parse errors
+                        Log.e(TAG, "Error parsing Gemini chunk: ${e.localizedMessage}")
                     }
                 }
             }
@@ -135,12 +142,11 @@ object LLMStreamService {
                 val url = if (baseUrl.endsWith("/chat/completions")) baseUrl else "$baseUrl/chat/completions"
 
                 val requestJson = JSONObject()
-                requestJson.put("model", modelId)
+                requestJson.put("model", effectiveModelId)
                 requestJson.put("stream", true)
 
                 val messagesArray = JSONArray()
 
-                // System prompt
                 if (systemInstruction.isNotBlank()) {
                     val sysObj = JSONObject()
                     sysObj.put("role", "system")
@@ -174,6 +180,8 @@ object LLMStreamService {
                 }
 
                 val response = client.newCall(requestBuilder.build()).execute()
+                Log.d(TAG, "OpenAI/OpenRouter HTTP response status: ${response.code}")
+
                 if (!response.isSuccessful) {
                     val errBody = response.body?.string() ?: ""
                     emit("Error (${response.code}): $errBody")
@@ -198,16 +206,33 @@ object LLMStreamService {
                         if (choices != null && choices.length() > 0) {
                             val choice = choices.getJSONObject(0)
                             val delta = choice.optJSONObject("delta")
-                            val text = delta?.optString("content", "") ?: ""
+                            var text = delta?.optString("content", "") ?: ""
+
+                            // Support reasoning / thinking content from OpenRouter / DeepSeek models
+                            if (text.isEmpty() && delta != null && delta.has("reasoning_content")) {
+                                text = delta.optString("reasoning_content", "")
+                            }
+
+                            // Fallback to message object if non-streaming or full message payload
+                            if (text.isEmpty()) {
+                                val messageObj = choice.optJSONObject("message")
+                                if (messageObj != null) {
+                                    text = messageObj.optString("content", "")
+                                }
+                            }
+
                             if (text.isNotEmpty()) {
+                                if (firstChunkTime < 0) firstChunkTime = System.currentTimeMillis() - startTime
+                                chunkCount++
                                 emit(text)
                             }
                         }
                     } catch (e: Exception) {
-                        // Ignore chunk parse errors
+                        Log.e(TAG, "Error parsing delta chunk: ${e.localizedMessage}")
                     }
                 }
             }
         }
+        Log.d(TAG, "Stream completed. Chunks=$chunkCount, TimeToFirstChunk=${firstChunkTime}ms, TotalTime=${System.currentTimeMillis() - startTime}ms")
     }.flowOn(Dispatchers.IO)
 }
