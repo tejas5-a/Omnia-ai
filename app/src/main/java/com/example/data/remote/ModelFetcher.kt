@@ -191,6 +191,7 @@ object ModelFetcher {
     fun getFallbackModels(type: ProviderType): List<AIModel> {
         return when (type) {
             ProviderType.GEMINI -> listOf(
+                AIModel("gemini-4-argon", "Gemini 4 Argon (High Thinking)", ProviderType.GEMINI, "ID: gemini-4-argon", 1000000, isFreeTier = true, supportsThinking = true, supportsVision = true),
                 AIModel("gemini-3.6-flash", "Gemini 3.6 Flash (Recommended)", ProviderType.GEMINI, "ID: gemini-3.6-flash", 1000000, isFreeTier = true, supportsThinking = true, supportsVision = true),
                 AIModel("gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview", ProviderType.GEMINI, "ID: gemini-3.1-pro-preview", 2000000, isFreeTier = true, supportsThinking = true, supportsVision = true),
                 AIModel("gemini-3.5-flash", "Gemini 3.5 Flash", ProviderType.GEMINI, "ID: gemini-3.5-flash", 1000000, isFreeTier = true, supportsThinking = false),

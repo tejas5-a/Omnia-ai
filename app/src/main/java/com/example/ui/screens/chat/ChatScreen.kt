@@ -10,8 +10,8 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -21,6 +21,16 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,8 +46,10 @@ import com.example.data.model.Attachment
 import com.example.data.model.ChatMessage
 import com.example.data.model.MessageSender
 import com.example.data.model.MessageStatus
+import com.example.ui.components.AiOrbView
 import com.example.ui.components.MarkdownText
 import com.example.ui.components.ModelSelectorHeader
+import com.example.ui.theme.*
 import java.io.ByteArrayOutputStream
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -71,15 +83,15 @@ fun ChatScreen(
         }
     }
 
-    LaunchedEffect(uiState.messages.size) {
-        if (uiState.messages.isNotEmpty()) {
+    LaunchedEffect(uiState.messages.size, uiState.activeThread?.id) {
+        if (uiState.messages.isNotEmpty() && isUserAtBottom) {
             listState.scrollToItem(uiState.messages.size - 1)
         }
     }
 
-    val lastMessageLength = uiState.messages.lastOrNull()?.content?.length ?: 0
-    LaunchedEffect(lastMessageLength) {
-        if (isUserAtBottom && uiState.messages.isNotEmpty()) {
+    val lastMessageContent = uiState.messages.lastOrNull()?.content ?: ""
+    LaunchedEffect(lastMessageContent) {
+        if (isUserAtBottom && uiState.messages.isNotEmpty() && uiState.isGenerating) {
             listState.scrollToItem(uiState.messages.size - 1)
         }
     }
@@ -114,18 +126,26 @@ fun ChatScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(
-                        text = uiState.activeThread?.title ?: "OMNIA MAX",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Column {
+                        Text(
+                            text = uiState.activeThread?.title ?: "OMNIA MAX",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = OmniaTextPrimary
+                        )
+                        Text(
+                            text = "Model: ${uiState.selectedModelId}",
+                            fontSize = 11.sp,
+                            color = OmniaElectricViolet
+                        )
+                    }
                 },
                 navigationIcon = {
                     IconButton(
                         onClick = onOpenDrawer,
                         modifier = Modifier.testTag("open_drawer_button")
                     ) {
-                        Icon(Icons.Default.Menu, contentDescription = "Open Drawer")
+                        Icon(Icons.Default.Menu, contentDescription = "Open Drawer", tint = OmniaTextSecondary)
                     }
                 },
                 actions = {
@@ -133,9 +153,10 @@ fun ChatScreen(
                         onClick = { viewModel.createNewThread() },
                         modifier = Modifier.testTag("appbar_new_chat_button")
                     ) {
-                        Icon(Icons.Default.AddComment, contentDescription = "New Chat")
+                        Icon(Icons.Default.AddComment, contentDescription = "New Chat", tint = OmniaElectricViolet)
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = OmniaMainBg)
             )
         },
         modifier = modifier
@@ -144,8 +165,9 @@ fun ChatScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(MaterialTheme.colorScheme.background)
+                .background(OmniaMainBg)
         ) {
+            // Model Selector Bar
             uiState.activeProvider?.let { provider ->
                 ModelSelectorHeader(
                     activeProvider = provider,
@@ -158,6 +180,7 @@ fun ChatScreen(
                 )
             }
 
+            // Message Feed
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -191,6 +214,7 @@ fun ChatScreen(
                 }
             }
 
+            // Attached Images Row Preview
             if (attachedImages.isNotEmpty()) {
                 Row(
                     modifier = Modifier
@@ -203,7 +227,7 @@ fun ChatScreen(
                             modifier = Modifier
                                 .size(56.dp)
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                                .background(OmniaElevatedSurface)
                         ) {
                             Text(
                                 text = "📷",
@@ -229,10 +253,13 @@ fun ChatScreen(
                 }
             }
 
+            // Luminous Composer Input Container
             Surface(
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 4.dp,
-                modifier = Modifier.fillMaxWidth()
+                color = OmniaCardBg,
+                tonalElevation = 6.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .border(1.dp, OmniaElectricViolet.copy(alpha = 0.25f), RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
             ) {
                 Row(
                     modifier = Modifier
@@ -240,6 +267,15 @@ fun ChatScreen(
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Decorative Glowing Multi-State AI Orb
+                    AiOrbView(
+                        size = 36.dp,
+                        isStreaming = uiState.isGenerating,
+                        isThinking = uiState.isGenerating && uiState.messages.lastOrNull()?.content.isNullOrEmpty()
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
                     IconButton(
                         onClick = {
                             photoPickerLauncher.launch(
@@ -251,64 +287,81 @@ fun ChatScreen(
                         Icon(
                             imageVector = Icons.Default.AttachFile,
                             contentDescription = "Attach File/Image",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            tint = OmniaElectricViolet
                         )
                     }
 
                     OutlinedTextField(
                         value = inputText,
                         onValueChange = { inputText = it },
-                        placeholder = { Text("Ask OMNIA MAX anything...", fontSize = 14.sp) },
+                        placeholder = { Text("Ask OMNIA MAX anything...", fontSize = 14.sp, color = OmniaTextMuted) },
                         modifier = Modifier
                             .weight(1f)
                             .testTag("chat_text_input"),
                         shape = RoundedCornerShape(24.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = OmniaPrimaryPurple,
+                            unfocusedBorderColor = OmniaElectricViolet.copy(alpha = 0.3f),
+                            focusedContainerColor = OmniaElevatedSurface,
+                            unfocusedContainerColor = OmniaElevatedSurface,
+                            focusedTextColor = OmniaTextPrimary,
+                            unfocusedTextColor = OmniaTextPrimary
+                        ),
                         maxLines = 4
                     )
 
                     Spacer(modifier = Modifier.width(8.dp))
 
-                    if (uiState.isGenerating) {
-                        IconButton(
-                            onClick = { viewModel.stopGeneration() },
-                            modifier = Modifier
-                                .size(48.dp)
-                                .background(Color(0xFFEF4444), CircleShape)
-                                .testTag("stop_generation_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Stop,
-                                contentDescription = "Stop Generation",
-                                tint = Color.White
-                            )
-                        }
-                    } else {
-                        IconButton(
-                            onClick = {
-                                if (inputText.isNotBlank() || attachedImages.isNotEmpty()) {
-                                    val textToSend = inputText
-                                    val attsToSend = attachedImages.toList()
-                                    inputText = ""
-                                    attachedImages.clear()
-                                    viewModel.sendMessage(textToSend, attsToSend)
-                                }
-                            },
-                            enabled = inputText.isNotBlank() || attachedImages.isNotEmpty(),
-                            modifier = Modifier
-                                .size(48.dp)
-                                .background(
-                                    if (inputText.isNotBlank() || attachedImages.isNotEmpty()) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.surfaceVariant,
-                                    CircleShape
+                    AnimatedContent(
+                        targetState = uiState.isGenerating,
+                        transitionSpec = {
+                            (scaleIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn()) togetherWith
+                                    (scaleOut(animationSpec = spring(stiffness = Spring.StiffnessHigh)) + fadeOut())
+                        },
+                        label = "send_stop_button_morph"
+                    ) { isGenerating ->
+                        if (isGenerating) {
+                            IconButton(
+                                onClick = { viewModel.stopGeneration() },
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(Color(0xFFFF5252), CircleShape)
+                                    .testTag("stop_generation_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Stop,
+                                    contentDescription = "Stop Generation",
+                                    tint = Color.White
                                 )
-                                .testTag("send_message_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Send,
-                                contentDescription = "Send Message",
-                                tint = if (inputText.isNotBlank() || attachedImages.isNotEmpty()) MaterialTheme.colorScheme.onPrimary
-                                else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            }
+                        } else {
+                            IconButton(
+                                onClick = {
+                                    if (inputText.isNotBlank() || attachedImages.isNotEmpty()) {
+                                        val textToSend = inputText
+                                        val attsToSend = attachedImages.toList()
+                                        inputText = ""
+                                        attachedImages.clear()
+                                        viewModel.sendMessage(textToSend, attsToSend)
+                                    }
+                                },
+                                enabled = inputText.isNotBlank() || attachedImages.isNotEmpty(),
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .background(
+                                        if (inputText.isNotBlank() || attachedImages.isNotEmpty()) OmniaPrimaryPurple
+                                        else OmniaElevatedSurface,
+                                        CircleShape
+                                    )
+                                    .testTag("send_message_button")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Send,
+                                    contentDescription = "Send Message",
+                                    tint = if (inputText.isNotBlank() || attachedImages.isNotEmpty()) Color.White
+                                    else OmniaTextMuted
+                                )
+                            }
                         }
                     }
                 }
@@ -318,7 +371,9 @@ fun ChatScreen(
 
     if (uiState.systemPromptSheetOpen) {
         ModalBottomSheet(
-            onDismissRequest = { viewModel.setSystemPromptSheetOpen(false) }
+            onDismissRequest = { viewModel.setSystemPromptSheetOpen(false) },
+            containerColor = OmniaCardBg,
+            contentColor = OmniaTextPrimary
         ) {
             Column(
                 modifier = Modifier
@@ -328,13 +383,14 @@ fun ChatScreen(
                 Text(
                     text = "Custom System Instructions",
                     style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = OmniaTextPrimary
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = "Configure how OMNIA MAX behaves, responds, and formats output for this conversation.",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = OmniaTextSecondary
                 )
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -355,14 +411,15 @@ fun ChatScreen(
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(onClick = { viewModel.setSystemPromptSheetOpen(false) }) {
-                        Text("Cancel")
+                        Text("Cancel", color = OmniaTextSecondary)
                     }
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = { viewModel.updateSystemInstruction(systemInstructionText) },
-                        shape = RoundedCornerShape(8.dp)
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = OmniaPrimaryPurple)
                     ) {
-                        Text("Save Instructions")
+                        Text("Save Instructions", color = Color.White)
                     }
                 }
             }
@@ -390,20 +447,30 @@ fun ChatMessageBubble(
                 text = if (isUser) "You" else (message.agentName ?: "OMNIA MAX"),
                 style = MaterialTheme.typography.labelMedium,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                color = OmniaTextSecondary
             )
         }
 
         Surface(
-            color = if (isUser) MaterialTheme.colorScheme.primaryContainer
-            else MaterialTheme.colorScheme.surfaceVariant,
+            color = if (isUser) OmniaElevatedSurface else OmniaCardBg,
             shape = RoundedCornerShape(
                 topStart = 16.dp,
                 topEnd = 16.dp,
                 bottomStart = if (isUser) 16.dp else 4.dp,
                 bottomEnd = if (isUser) 4.dp else 16.dp
             ),
-            modifier = Modifier.widthIn(max = 320.dp)
+            modifier = Modifier
+                .widthIn(max = 320.dp)
+                .border(
+                    1.dp,
+                    if (isUser) OmniaPrimaryPurple.copy(alpha = 0.4f) else OmniaElectricViolet.copy(alpha = 0.2f),
+                    RoundedCornerShape(
+                        topStart = 16.dp,
+                        topEnd = 16.dp,
+                        bottomStart = if (isUser) 16.dp else 4.dp,
+                        bottomEnd = if (isUser) 4.dp else 16.dp
+                    )
+                )
         ) {
             Column(modifier = Modifier.padding(14.dp)) {
                 if (message.status == MessageStatus.STREAMING && message.content.isEmpty()) {
@@ -411,10 +478,10 @@ fun ChatMessageBubble(
                         CircularProgressIndicator(
                             modifier = Modifier.size(16.dp),
                             strokeWidth = 2.dp,
-                            color = MaterialTheme.colorScheme.primary
+                            color = OmniaPrimaryPurple
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Thinking & Generating...", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Thinking & Generating...", fontSize = 13.sp, color = OmniaTextSecondary)
                     }
                 } else {
                     MarkdownText(text = message.content)
@@ -424,28 +491,56 @@ fun ChatMessageBubble(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         text = "Error: ${message.errorMessage ?: "Failed to generate response"}",
-                        color = Color(0xFFEF4444),
+                        color = Color(0xFFFF5252),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
 
                 if (!isUser && (message.status == MessageStatus.SUCCESS || message.content.isNotEmpty())) {
+                    var isCopied by remember { mutableStateOf(false) }
+                    val scope = rememberCoroutineScope()
+
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(
                         horizontalArrangement = Arrangement.End,
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         IconButton(
-                            onClick = onCopyClicked,
+                            onClick = {
+                                onCopyClicked()
+                                isCopied = true
+                                scope.launch {
+                                    kotlinx.coroutines.delay(1800)
+                                    isCopied = false
+                                }
+                            },
                             modifier = Modifier.size(24.dp)
                         ) {
-                            Icon(
-                                Icons.Default.ContentCopy,
-                                contentDescription = "Copy message",
-                                modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                            AnimatedContent(
+                                targetState = isCopied,
+                                transitionSpec = {
+                                    (scaleIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn()) togetherWith
+                                            (scaleOut(animationSpec = spring(stiffness = Spring.StiffnessHigh)) + fadeOut())
+                                },
+                                label = "msg_copy_anim"
+                            ) { copied ->
+                                if (copied) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        contentDescription = "Copied",
+                                        modifier = Modifier.size(14.dp),
+                                        tint = OmniaSuccessGreen
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Default.ContentCopy,
+                                        contentDescription = "Copy message",
+                                        modifier = Modifier.size(14.dp),
+                                        tint = OmniaTextSecondary
+                                    )
+                                }
+                            }
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         IconButton(
@@ -456,7 +551,7 @@ fun ChatMessageBubble(
                                 Icons.Default.Refresh,
                                 contentDescription = "Regenerate response",
                                 modifier = Modifier.size(14.dp),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                tint = OmniaTextSecondary
                             )
                         }
                     }
@@ -478,34 +573,21 @@ fun EmptyChatWelcomeView(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Surface(
-            color = MaterialTheme.colorScheme.primaryContainer,
-            shape = CircleShape,
-            modifier = Modifier.size(72.dp)
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(
-                    text = "Ω",
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    fontSize = 36.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-        }
+        AiOrbView(size = 80.dp, isPulsing = true)
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
         Text(
             text = "Welcome to OMNIA MAX",
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface
+            color = OmniaTextPrimary
         )
 
         Text(
-            text = "Powered by $activeModelId with multi-agent intelligence.",
+            text = "Active Model: $activeModelId",
             style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = OmniaElectricViolet
         )
 
         Spacer(modifier = Modifier.height(32.dp))
@@ -513,7 +595,7 @@ fun EmptyChatWelcomeView(
         Text(
             text = "Suggested Prompts",
             style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary,
+            color = OmniaLavenderHighlight,
             fontWeight = FontWeight.Bold
         )
 
@@ -529,15 +611,17 @@ fun EmptyChatWelcomeView(
             OutlinedCard(
                 onClick = { onPromptSuggested(prompt) },
                 shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.outlinedCardColors(containerColor = OmniaCardBg),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 4.dp)
+                    .border(1.dp, OmniaElectricViolet.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
             ) {
                 Text(
                     text = prompt,
                     modifier = Modifier.padding(12.dp),
                     fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurface
+                    color = OmniaTextPrimary
                 )
             }
         }

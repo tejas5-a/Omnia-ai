@@ -47,27 +47,14 @@ fun DrawerContent(
                 .fillMaxSize()
                 .padding(16.dp)
         ) {
-            // App Brand Header
+            // App Brand Header with Pulsing AI Orb
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.primary,
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.size(36.dp)
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "Ω",
-                            color = MaterialTheme.colorScheme.onPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp
-                        )
-                    }
-                }
+                AiOrbView(size = 36.dp, isPulsing = true)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(

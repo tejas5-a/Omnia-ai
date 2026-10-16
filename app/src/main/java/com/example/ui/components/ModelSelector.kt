@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.AIModel
 import com.example.data.model.ProviderConfig
+import com.example.ui.theme.*
 
 @Composable
 fun ModelSelectorHeader(
@@ -32,113 +33,64 @@ fun ModelSelectorHeader(
     onModelSelected: (String) -> Unit,
     onThinkingToggled: (Boolean) -> Unit,
     onSystemPromptClicked: () -> Unit,
+    onRefreshModels: () -> Unit = {},
+    onManualModelAdded: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var dropdownExpanded by remember { mutableStateOf(false) }
+    var dialogOpen by remember { mutableStateOf(false) }
 
     val activeModel = availableModels.firstOrNull { it.id == selectedModelId }
         ?: AIModel(selectedModelId, selectedModelId, activeProvider.type)
 
     Surface(
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 2.dp,
+        color = OmniaMainBg,
         modifier = modifier.fillMaxWidth()
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             // Model Selector Dropdown Pill
-            Box {
-                Row(
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(OmniaCardBg)
+                    .border(1.dp, OmniaElectricViolet.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+                    .clickable { dialogOpen = true }
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                    .testTag("model_selector_dropdown"),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
                     modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .clickable { dropdownExpanded = true }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                        .testTag("model_selector_dropdown"),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(
-                                if (activeProvider.enabled) Color(0xFF10B981) else Color(0xFFEF4444)
-                            )
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
+                        .size(8.dp)
+                        .clip(CircleShape)
+                        .background(if (activeProvider.enabled) OmniaSuccessGreen else Color(0xFFFF5252))
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
                     Text(
                         text = activeModel.name,
                         style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.Bold,
+                        color = OmniaTextPrimary,
                         fontSize = 13.sp
                     )
-                    Icon(
-                        imageVector = Icons.Default.ArrowDropDown,
-                        contentDescription = "Select Model",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-
-                DropdownMenu(
-                    expanded = dropdownExpanded,
-                    onDismissRequest = { dropdownExpanded = false }
-                ) {
                     Text(
-                        text = "${activeProvider.name} Models",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        text = activeModel.id,
+                        fontSize = 10.sp,
+                        color = OmniaElectricViolet
                     )
-                    HorizontalDivider()
-
-                    availableModels.forEach { model ->
-                        DropdownMenuItem(
-                            text = {
-                                Column {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = model.name,
-                                            fontWeight = if (model.id == selectedModelId) FontWeight.Bold else FontWeight.Normal
-                                        )
-                                        if (model.isFreeTier) {
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Surface(
-                                                color = Color(0xFF10B981).copy(alpha = 0.2f),
-                                                shape = RoundedCornerShape(4.dp)
-                                            ) {
-                                                Text(
-                                                    text = "FREE",
-                                                    color = Color(0xFF10B981),
-                                                    fontSize = 10.sp,
-                                                    fontWeight = FontWeight.Bold,
-                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                    if (model.description.isNotBlank()) {
-                                        Text(
-                                            text = model.description,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            fontSize = 11.sp
-                                        )
-                                    }
-                                }
-                            },
-                            onClick = {
-                                onModelSelected(model.id)
-                                dropdownExpanded = false
-                            }
-                        )
-                    }
                 }
+                Spacer(modifier = Modifier.width(4.dp))
+                Icon(
+                    imageVector = Icons.Default.ArrowDropDown,
+                    contentDescription = "Select Model",
+                    tint = OmniaElectricViolet
+                )
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -146,20 +98,20 @@ fun ModelSelectorHeader(
                 FilterChip(
                     selected = isHighThinking,
                     onClick = { onThinkingToggled(!isHighThinking) },
-                    label = {
-                        Text(
-                            text = "Thinking",
-                            fontSize = 12.sp
-                        )
-                    },
+                    label = { Text("Reasoning", fontSize = 11.sp, color = if (isHighThinking) OmniaLavenderHighlight else OmniaTextSecondary) },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.Psychology,
-                            contentDescription = "Thinking Level",
+                            contentDescription = "Reasoning Level",
+                            tint = if (isHighThinking) OmniaAccentCyan else OmniaTextMuted,
                             modifier = Modifier.size(16.dp)
                         )
                     },
-                    modifier = Modifier.testTag("thinking_mode_chip")
+                    modifier = Modifier.testTag("thinking_mode_chip"),
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = OmniaElevatedSurface,
+                        containerColor = OmniaCardBg
+                    )
                 )
 
                 Spacer(modifier = Modifier.width(6.dp))
@@ -174,10 +126,23 @@ fun ModelSelectorHeader(
                     Icon(
                         imageVector = Icons.Default.Tune,
                         contentDescription = "System Instructions",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = OmniaElectricViolet
                     )
                 }
             }
         }
+    }
+
+    if (dialogOpen) {
+        ModelSelectorDialog(
+            activeProvider = activeProvider,
+            selectedModelId = selectedModelId,
+            availableModels = availableModels,
+            isLoading = false,
+            onModelSelected = onModelSelected,
+            onRefreshModels = onRefreshModels,
+            onManualModelAdded = onManualModelAdded,
+            onDismiss = { dialogOpen = false }
+        )
     }
 }

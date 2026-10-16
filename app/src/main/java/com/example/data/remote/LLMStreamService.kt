@@ -54,7 +54,7 @@ object LLMStreamService {
                     requestJson.put("systemInstruction", sysObj)
                 }
 
-                if (isHighThinking) {
+                if (isHighThinking || effectiveModelId.contains("argon") || effectiveModelId.contains("thinking")) {
                     val genConfig = JSONObject()
                     val thinkingConfig = JSONObject().put("thinkingLevel", "HIGH")
                     genConfig.put("thinkingConfig", thinkingConfig)

@@ -1,6 +1,6 @@
 {
-  "summary": "Implementation plan for fixing critical bugs in OMNIA MAX: Permanent Settings Storage via DataStore & Keystore, OpenRouter Model Fetching with exact IDs, Manual Model ID Input & Validation, and Lifecycle State Restoration.",
-  "updatedAt": "2026-10-15T15:21:51.844381296Z",
+  "summary": "Comprehensive implementation plan for transforming OMNIA MAX into a Google Assistant-inspired MAX Voice & Device Personal Assistant with wake-word detection, device control engine, messaging adapters, speech synthesis, and OpenRouter AI fallback.",
+  "updatedAt": "2026-10-16T10:26:47.545257094Z",
   "requestFeedback": true,
   "userFacing": true
 }

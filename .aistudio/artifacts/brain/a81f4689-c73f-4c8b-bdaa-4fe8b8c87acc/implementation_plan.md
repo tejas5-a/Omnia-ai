@@ -1,94 +1,109 @@
-# OMNIA MAX — Bug Fix & Permanent Settings Storage Plan
+# MAX Personal Assistant — Google Assistant-Inspired Voice & Device Assistant
 
-This plan details the root causes and architectural fixes for settings persistence, OpenRouter model fetching, manual model ID entry, and app lifecycle state restoration in OMNIA MAX.
-
----
-
-## User Review & Confirmed Choices
-
-> [!IMPORTANT]
-> The following user preferences were confirmed during Phase 1 clarification:
-> - **API Credential Security**: Android Keystore / `EncryptedSharedPreferences` for secure credential storage.
-> - **App Settings Engine**: Jetpack DataStore (`PreferencesDataStore`) for active theme, selected model ID, free models toggle, and system prompts with reactive `Flow` updates.
+Transform OMNIA MAX into a full-fledged, voice-first Google Assistant-inspired personal assistant named **MAX**. MAX combines real-time speech recognition, continuous/push-to-talk wake-word listening, Android device controls, messaging preparation and sending across WhatsApp, SMS, Instagram, and Messenger, and OpenRouter AI multi-model intelligence for general reasoning.
 
 ---
 
-## 1. Root Cause Analysis of Reported Bugs
-
-1. **Settings Resetting Across Lifecycle**:
-   - *Cause*: Settings were stored in transient ViewModel state (`MutableStateFlow`) and in memory defaults during `init { ... }` without a persistent DataStore layer. When navigating between screens or restarting the app, ViewModels re-initialized to hardcoded default values (`gemini-3.6-flash`, darkTheme = true).
-2. **OpenRouter Model Fetching & ID Visibility**:
-   - *Cause*: `ModelFetcher.kt` caught network errors and silently replaced empty lists with hardcoded fallback models instead of preserving actual API responses. Also, exact model IDs (e.g. `google/gemini-2.0-flash-lite:free`) were not displayed separately from human-readable model names.
-3. **Missing Manual Model ID Input**:
-   - *Cause*: `ProvidersScreen` lacked an explicit manual Model ID text field with a "Test & Save" trigger for cases where automatic fetching is blocked or when using custom endpoint IDs.
-4. **Navigation & Process Recreation State Loss**:
-   - *Cause*: `MainActivity` used `remember { ChatViewModel(...) }` directly instead of properly scoped ViewModels or DataStore-backed singletons, causing state resets on back navigation.
+> [!IMPORTANT] User Review & Critical Decisions
+>
+> 1. **Voice Interaction Strategy**: Push-To-Talk standard with a configurable continuous wake-word listener ("Hey Max") running in an active Foreground Service when enabled.
+> 2. **Device Command Confirmations**: Read-only actions (battery, clock, volume check) execute deterministically with spoken feedback. Actions with external effects (sending messages, app launches, settings toggles) present a visual voice overlay confirmation dialog with read-back audio.
+> 3. **Messaging Fallback Logic**: If a messaging platform SDK/Intent direct send is restricted by third-party Android sandboxing, MAX automatically pre-populates the recipient and exact message text in the target app's native sharing or message intent, guiding the user to tap send.
 
 ---
 
-## 2. Proposed Architectural Fixes
+## 1. Overview & Core Concept
 
-### A. Permanent Settings & Encrypted Credential Engine
-- **`SecurePreferencesManager`**: Uses Android Keystore to encrypt API keys (OpenAI, OpenRouter, Custom) so private credentials are never stored in plain text.
-- **`AppPreferencesRepository`**: Built on Jetpack `DataStore<Preferences>`, persisting:
-  - `activeProviderId` & `selectedModelId`
-  - `isFreeModelsOnly` toggle
-  - `darkThemeEnabled`
-  - `defaultSystemPrompt`
-  - `isHighThinking`
-- **Startup Sync**: Load DataStore preferences *before* initializing the model selector or sending chat requests.
-
-### B. OpenRouter API & Dynamic Model Fetching Upgrade
-- Endpoint: `GET https://openrouter.ai/api/v1/models`
-- Header: `Authorization: Bearer ${apiKey}`
-- Extract `id` (e.g. `anthropic/claude-3.5-sonnet`), `name`, `context_length`, `pricing`, and modalities.
-- Render exact Model ID (`provider/model-name`) underneath the human-readable display name.
-- Persist fetched model lists in Room DB; load cached models on cold boot without showing fake model IDs on fetch failures.
-
-### C. Manual Model ID Entry & Validation
-- Add a dedicated "Custom Model ID" input field in `ProvidersScreen`.
-- Include a **TEST MODEL** button that sends a 1-token minimal test request to verify API compatibility before saving.
-
-### D. Navigation & Lifecycle Fix
-- Expose single DataStore-backed Flow state in `ChatViewModel` and `ProvidersViewModel`.
-- Ensure async fetch operations check current user selection timestamps so background fetches never overwrite newer manual user selections.
+- **What It Does**: MAX acts as an intelligent Android Personal Assistant. It listens to spoken or typed voice commands, resolves recipient contacts, executes device commands (flashlight, volume, alarms, timers, app opening, settings, battery), formats and sends personal messages, and falls back to OpenRouter multi-model AI for complex reasoning.
+- **Target Audience**: Android users who want a unified voice assistant capable of hands-free interaction, system utility control, multi-platform messaging assistance, and deep AI reasoning.
+- **Key Value**: Operates on real public Android APIs, respects device safety and privacy, eliminates guesswork through explicit message read-backs, and preserves existing OMNIA MAX multi-model chat history and settings.
 
 ---
 
-## 3. Technical System Architecture
+## 2. User Experience & Visual Design
+
+- **Voice Assistant Overlay & HUD**:
+  - A bottom sheet / floating overlay powered by the multi-state animated `AiOrbView` (idle, listening, processing, speaking, success, error).
+  - Dynamic audio waveform animation and live speech-to-text transcript feedback during voice capture.
+  - Spoken Text-To-Speech (TTS) responses using `android.speech.tts.TextToSpeech`.
+- **Messaging Confirmation Flow**:
+  - When user says "Send a WhatsApp message to Rahul saying I'll be late", MAX resolves contact candidates.
+  - If multiple matches exist, displays a contact selector card.
+  - Reads back the final recipient and exact message string aloud ("Ready to send to Rahul on WhatsApp: 'I'll be late'. Say Send or Cancel.").
+  - Interactive "Send Now", "Edit", and "Cancel" buttons with voice recognition listener active for "Send" / "Cancel".
+- **Assistant Settings & Privacy**:
+  - Dedicated Assistant Settings panel to toggle "Hey Max" Wake Word, TTS Speech Speed & Voice Pitch, Lock Screen Voice Responses, and Permission Status indicators.
+
+---
+
+## 3. Key Product Decisions & Trade-Offs
+
+- **Decision 1: Real Speech Recognition vs. Web Audio / External API**
+  - *Chosen Approach*: Use Android's native `SpeechRecognizer` API for zero-latency, offline/on-device spoken command recognition.
+  - *Why*: Native `SpeechRecognizer` integrates seamlessly with Android audio focus, supports continuous phrase detection, and works standard without requiring paid external speech APIs.
+- **Decision 2: Deterministic Command Engine + OpenRouter AI Fallback**
+  - *Chosen Approach*: First run spoken commands through a regex/rule-based natural language parser (`AssistantCommandParser`). If a device or messaging intent matches, execute locally with 100% deterministic reliability. If no local command matches, send the context to OpenRouter AI for conversational completion.
+  - *Why*: Prevents AI hallucinations when setting timers or checking battery, while allowing full AI intelligence for general queries.
+- **Decision 3: Android Permission Safety & Platform Intents**
+  - *Chosen Approach*: Request necessary runtime permissions (`RECORD_AUDIO`, `READ_CONTACTS`, `POST_NOTIFICATIONS`, `SEND_SMS`) dynamically in Compose. For restricted third-party messaging apps (WhatsApp, Instagram, Messenger), open native intents with pre-filled payload and target recipient.
+  - *Why*: Strict adherence to Google Play policies—no private accessibility scraping or root exploits.
+
+---
+
+## 4. Technical Architecture & Data Strategy
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                      OMNIA MAX Persistence Layer                         │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│   ┌───────────────────────────┐         ┌───────────────────────────┐   │
-│   │ Jetpack Preferences       │         │ Keystore Encrypted        │   │
-│   │ DataStore                 │         │ SharedPreferences         │   │
-│   │ (Selected Model, Theme,   │         │ (OpenAI & OpenRouter      │   │
-│   │  Free Models Only Toggle) │         │  Secret API Keys)         │   │
-│   └─────────────┬─────────────┘         └─────────────┬─────────────┘   │
-│                 │                                     │                 │
-│                 └──────────────────┬──────────────────┘                 │
-│                                    │                                    │
-│                         ┌──────────▼──────────┐                         │
-│                         │ AppPreferencesRepo  │                         │
-│                         └──────────┬──────────┘                         │
-│                                    │                                    │
-│                         ┌──────────▼──────────┐                         │
-│                         │  Room DB Persistence│                         │
-│                         │ (Cached Model Lists,│                         │
-│                         │  Chat Messages)     │                         │
-│                         └─────────────────────┘                         │
-└─────────────────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                        USER VOICE / TEXT INPUT                         │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                        MAX VOICE ASSISTANT ENGINE                      │
+│   - SpeechRecognizer (On-Device Voice Input)                           │
+│   - TextToSpeech (Audio Response Manager)                              │
+│   - MaxWakeWordService (Foreground Listener for "Hey Max")             │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                        ASSISTANT COMMAND PARSER                        │
+│   Parses intents: Device Controls, Messaging, Apps, Settings, AI      │
+└───────────┬──────────────────────────────────────────┬─────────────────┘
+            │ Local Intent Match                       │ General Query
+            ▼                                          ▼
+┌─────────────────────────┐               ┌──────────────────────────────┐
+│  DEVICE CONTROL ENGINE  │               │   OPENROUTER AI ENGINE       │
+│  - Flashlight / Volume  │               │   - Multi-Model LLM Gateway  │
+│  - Alarm / Timer        │               │   - System Prompt Context    │
+│  - App Launcher         │               │   - Streamed Response        │
+│  - Settings Intents     │               └──────────────┬───────────────┘
+│  - Battery / Clock      │                              │
+└───────────┬─────────────┘                              │
+            │                                            │
+            ▼                                            │
+┌─────────────────────────┐                              │
+│ MESSAGING DISPATCHER    │                              │
+│ - Contact Resolver      │                              │
+│ - Read-Back & Confirm   │                              │
+│ - WhatsApp / SMS / IG   │                              │
+└───────────┬─────────────┘                              │
+            │                                            │
+            └──────────────────────┬─────────────────────┘
+                                   │
+                                   ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                       JETPACK COMPOSE ASSISTANT HUD                    │
+│   - Animated AiOrbView (Listening, Processing, Speaking)              │
+│   - Live Waveforms & Read-Back Confirmation Cards                      │
+│   - Assistant Preferences & Voice Controls                             │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
----
-
-## 4. Test Verification Plan
-
-1. Save OpenRouter API key in Keystore → Verify encrypted storage.
-2. Fetch OpenRouter models → Verify exact model IDs (`provider/model-name`) are displayed and stored in Room.
-3. Select model & restart app → Verify selected model persists from DataStore.
-4. Navigate across screens → Verify active model and theme stay intact.
-5. Enter manual Model ID & click Test → Verify real API query validation and persistence.
+### Planned Components
+1. `com.example.assistant.engine.VoiceAssistantManager`: Manages `SpeechRecognizer`, `TextToSpeech`, and listening states.
+2. `com.example.assistant.engine.AssistantCommandParser`: Evaluates text strings and classifies into `AssistantCommand` types (`DeviceControl`, `SendMessage`, `OpenApp`, `GeneralAI`).
+3. `com.example.assistant.engine.DeviceControlExecutor`: Handles Android system API calls (`CameraManager` for flashlight, `AudioManager` for volume, `AlarmClock` intents, `BatteryManager`, `Settings` intents).
+4. `com.example.assistant.messaging.MessagingDispatcher`: Resolves contacts using `ContactsContract`, validates recipient, prepares SMS/WhatsApp/Instagram/Messenger intents, and manages confirmation UI state.
+5. `com.example.assistant.service.MaxWakeWordService`: Android Foreground Service for continuous wake-word monitoring when enabled.
+6. `com.example.assistant.ui.AssistantVoiceOverlay`: Compose bottom sheet overlay with visual AI Orb, live transcript, and command execution status cards.
