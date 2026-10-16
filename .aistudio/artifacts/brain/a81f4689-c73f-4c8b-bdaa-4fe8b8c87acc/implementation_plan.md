@@ -1,109 +1,94 @@
-# MAX Personal Assistant — Google Assistant-Inspired Voice & Device Assistant
+# OMNIA MAX — Security Audit & Google Play Protect Hardening Plan
 
-Transform OMNIA MAX into a full-fledged, voice-first Google Assistant-inspired personal assistant named **MAX**. MAX combines real-time speech recognition, continuous/push-to-talk wake-word listening, Android device controls, messaging preparation and sending across WhatsApp, SMS, Instagram, and Messenger, and OpenRouter AI multi-model intelligence for general reasoning.
+This plan performs a complete security audit of OMNIA MAX to eliminate potential Google Play Protect high-risk detection flags, enforce zero-trust privacy controls, remove excessive permissions, secure API keys, and harden the application for safe release.
 
 ---
 
 > [!IMPORTANT] User Review & Critical Decisions
 >
-> 1. **Voice Interaction Strategy**: Push-To-Talk standard with a configurable continuous wake-word listener ("Hey Max") running in an active Foreground Service when enabled.
-> 2. **Device Command Confirmations**: Read-only actions (battery, clock, volume check) execute deterministically with spoken feedback. Actions with external effects (sending messages, app launches, settings toggles) present a visual voice overlay confirmation dialog with read-back audio.
-> 3. **Messaging Fallback Logic**: If a messaging platform SDK/Intent direct send is restricted by third-party Android sandboxing, MAX automatically pre-populates the recipient and exact message text in the target app's native sharing or message intent, guiding the user to tap send.
+> 1. **Permission Reduction (Principle of Least Privilege)**:
+>    - **Root Cause of Play Protect Warning**: Combining `SEND_SMS`, `READ_CONTACTS`, `RECORD_AUDIO`, and `FOREGROUND_SERVICE_MICROPHONE` in an app that is not a default SMS handler triggers Google Play Protect's spyware/data-harvesting heuristic flags.
+>    - **Fix**: Remove `android.permission.SEND_SMS` and `android.permission.READ_CONTACTS` from `AndroidManifest.xml`.
+>    - **Replacement**: Use zero-permission Android system `Intent.ACTION_SENDTO` (with `smsto:` payload) for SMS dispatch, and `ActivityResultContracts.PickContact()` for recipient selection.
+> 2. **Privacy-First Microphone & Wake-Word Consent**:
+>    - Require explicit opt-in user consent card before enabling `MaxWakeWordService`.
+>    - Display an un-dismissable foreground notification badge with a prominent "Turn Off" button while the microphone listener is active.
+>    - Ensure raw audio is processed strictly on-device for wake-word matching and never recorded or uploaded to remote servers.
+> 3. **API Key & Network Security**:
+>    - Store OpenRouter and provider API keys in Android Keystore-backed `EncryptedSharedPreferences`.
+>    - Suppress sensitive key headers from HTTP logging interceptors in release builds.
 
 ---
 
-## 1. Overview & Core Concept
+## 1. Security Audit Findings & Vulnerability Analysis
 
-- **What It Does**: MAX acts as an intelligent Android Personal Assistant. It listens to spoken or typed voice commands, resolves recipient contacts, executes device commands (flashlight, volume, alarms, timers, app opening, settings, battery), formats and sends personal messages, and falls back to OpenRouter multi-model AI for complex reasoning.
-- **Target Audience**: Android users who want a unified voice assistant capable of hands-free interaction, system utility control, multi-platform messaging assistance, and deep AI reasoning.
-- **Key Value**: Operates on real public Android APIs, respects device safety and privacy, eliminates guesswork through explicit message read-backs, and preserves existing OMNIA MAX multi-model chat history and settings.
-
----
-
-## 2. User Experience & Visual Design
-
-- **Voice Assistant Overlay & HUD**:
-  - A bottom sheet / floating overlay powered by the multi-state animated `AiOrbView` (idle, listening, processing, speaking, success, error).
-  - Dynamic audio waveform animation and live speech-to-text transcript feedback during voice capture.
-  - Spoken Text-To-Speech (TTS) responses using `android.speech.tts.TextToSpeech`.
-- **Messaging Confirmation Flow**:
-  - When user says "Send a WhatsApp message to Rahul saying I'll be late", MAX resolves contact candidates.
-  - If multiple matches exist, displays a contact selector card.
-  - Reads back the final recipient and exact message string aloud ("Ready to send to Rahul on WhatsApp: 'I'll be late'. Say Send or Cancel.").
-  - Interactive "Send Now", "Edit", and "Cancel" buttons with voice recognition listener active for "Send" / "Cancel".
-- **Assistant Settings & Privacy**:
-  - Dedicated Assistant Settings panel to toggle "Hey Max" Wake Word, TTS Speech Speed & Voice Pitch, Lock Screen Voice Responses, and Permission Status indicators.
+| Audit Area | Findings & Risk Level | Remediation Action |
+| :--- | :--- | :--- |
+| **Permissions** | **HIGH RISK**: `SEND_SMS` & `READ_CONTACTS` combined with background microphone permission triggers Play Protect malware heuristics. | Remove `SEND_SMS` and `READ_CONTACTS` from Manifest. Replace with system `Intent.ACTION_SENDTO` and contact pickers. |
+| **Microphone / Wake-Word** | **MEDIUM RISK**: `MaxWakeWordService` starts without prior consent dialog. | Implement explicit Privacy Consent Modal prior to activating background service. |
+| **API Key Credentials** | **MEDIUM RISK**: Direct API key storage in plaintext SharedPreferences risks credential leakage. | Enforce `EncryptedSharedPreferences` backed by Android Keystore. Mask API keys in logs. |
+| **Network Requests** | **LOW RISK**: Ensure all API calls use HTTPS with valid TLS certificates. | Validate Retrofit/OkHttp HTTPS endpoints for OpenRouter and Gemini API gateway. |
+| **Exported Components** | **LOW RISK**: `MainActivity` is exported for launcher; `MaxWakeWordService` is non-exported (`android:exported="false"`). | Retain non-exported guard on background service. |
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
+## 2. User Experience & Privacy Safeguards
 
-- **Decision 1: Real Speech Recognition vs. Web Audio / External API**
-  - *Chosen Approach*: Use Android's native `SpeechRecognizer` API for zero-latency, offline/on-device spoken command recognition.
-  - *Why*: Native `SpeechRecognizer` integrates seamlessly with Android audio focus, supports continuous phrase detection, and works standard without requiring paid external speech APIs.
-- **Decision 2: Deterministic Command Engine + OpenRouter AI Fallback**
-  - *Chosen Approach*: First run spoken commands through a regex/rule-based natural language parser (`AssistantCommandParser`). If a device or messaging intent matches, execute locally with 100% deterministic reliability. If no local command matches, send the context to OpenRouter AI for conversational completion.
-  - *Why*: Prevents AI hallucinations when setting timers or checking battery, while allowing full AI intelligence for general queries.
-- **Decision 3: Android Permission Safety & Platform Intents**
-  - *Chosen Approach*: Request necessary runtime permissions (`RECORD_AUDIO`, `READ_CONTACTS`, `POST_NOTIFICATIONS`, `SEND_SMS`) dynamically in Compose. For restricted third-party messaging apps (WhatsApp, Instagram, Messenger), open native intents with pre-filled payload and target recipient.
-  - *Why*: Strict adherence to Google Play policies—no private accessibility scraping or root exploits.
+- **Permission Rationale Dialogs**:
+  - When the user triggers voice assistant features, present clear Compose rationale dialogs explaining why microphone access is required.
+  - If permissions are denied, degrade gracefully to text input mode without crashing.
+- **Microphone Privacy Indicator**:
+  - Display active microphone state on the `AiOrbView` UI and in the persistent system notification bar.
+  - Provide a one-tap "Stop Listening" action in both the UI and notification.
 
 ---
 
-## 4. Technical Architecture & Data Strategy
+## 3. Technical Architecture & Security Flow
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                        USER VOICE / TEXT INPUT                         │
+│                        USER INPUT / VOICE COMMAND                      │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│                        MAX VOICE ASSISTANT ENGINE                      │
-│   - SpeechRecognizer (On-Device Voice Input)                           │
-│   - TextToSpeech (Audio Response Manager)                              │
-│   - MaxWakeWordService (Foreground Listener for "Hey Max")             │
+│                    ZERO-PERMISSION INTENT DELEGATION                   │
+│   - SMS: Intent.ACTION_SENDTO (smsto:uri) -> Direct System Composer      │
+│   - Contacts: ActivityResultContracts.PickContact()                    │
+│   - Social Apps: Native Share/Message Intents                          │
 └───────────────────────────────────┬────────────────────────────────────┘
                                     │
                                     ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│                        ASSISTANT COMMAND PARSER                        │
-│   Parses intents: Device Controls, Messaging, Apps, Settings, AI      │
-└───────────┬──────────────────────────────────────────┬─────────────────┘
-            │ Local Intent Match                       │ General Query
-            ▼                                          ▼
-┌─────────────────────────┐               ┌──────────────────────────────┐
-│  DEVICE CONTROL ENGINE  │               │   OPENROUTER AI ENGINE       │
-│  - Flashlight / Volume  │               │   - Multi-Model LLM Gateway  │
-│  - Alarm / Timer        │               │   - System Prompt Context    │
-│  - App Launcher         │               │   - Streamed Response        │
-│  - Settings Intents     │               └──────────────┬───────────────┘
-│  - Battery / Clock      │                              │
-└───────────┬─────────────┘                              │
-            │                                            │
-            ▼                                            │
-┌─────────────────────────┐                              │
-│ MESSAGING DISPATCHER    │                              │
-│ - Contact Resolver      │                              │
-│ - Read-Back & Confirm   │                              │
-│ - WhatsApp / SMS / IG   │                              │
-└───────────┬─────────────┘                              │
-            │                                            │
-            └──────────────────────┬─────────────────────┘
-                                   │
-                                   ▼
+│                     ANDROID KEYSTORE SECRET STORE                      │
+│   - EncryptedSharedPreferences (MasterKey AES-256)                    │
+│   - Redacted OkHttp Logging Headers (Authorization: Bearer ***)        │
+└───────────────────────────────────┬────────────────────────────────────┘
+                                    │
+                                    ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│                       JETPACK COMPOSE ASSISTANT HUD                    │
-│   - Animated AiOrbView (Listening, Processing, Speaking)              │
-│   - Live Waveforms & Read-Back Confirmation Cards                      │
-│   - Assistant Preferences & Voice Controls                             │
+│                 PRIVACY-FIRST FOREGROUND SERVICE                       │
+│   - MaxWakeWordService (Non-Exported)                                  │
+│   - User Opt-In Consent Verification                                  │
+│   - On-Device Audio Processing                                         │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Planned Components
-1. `com.example.assistant.engine.VoiceAssistantManager`: Manages `SpeechRecognizer`, `TextToSpeech`, and listening states.
-2. `com.example.assistant.engine.AssistantCommandParser`: Evaluates text strings and classifies into `AssistantCommand` types (`DeviceControl`, `SendMessage`, `OpenApp`, `GeneralAI`).
-3. `com.example.assistant.engine.DeviceControlExecutor`: Handles Android system API calls (`CameraManager` for flashlight, `AudioManager` for volume, `AlarmClock` intents, `BatteryManager`, `Settings` intents).
-4. `com.example.assistant.messaging.MessagingDispatcher`: Resolves contacts using `ContactsContract`, validates recipient, prepares SMS/WhatsApp/Instagram/Messenger intents, and manages confirmation UI state.
-5. `com.example.assistant.service.MaxWakeWordService`: Android Foreground Service for continuous wake-word monitoring when enabled.
-6. `com.example.assistant.ui.AssistantVoiceOverlay`: Compose bottom sheet overlay with visual AI Orb, live transcript, and command execution status cards.
+---
+
+## 4. Implementation Steps
+
+1. **Manifest Hardening (`AndroidManifest.xml`)**:
+   - Remove `<uses-permission android:name="android.permission.SEND_SMS" />`
+   - Remove `<uses-permission android:name="android.permission.READ_CONTACTS" />`
+   - Verify all remaining permissions (`RECORD_AUDIO`, `INTERNET`, `ACCESS_NETWORK_STATE`, `FLASHLIGHT`, `POST_NOTIFICATIONS`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MICROPHONE`).
+2. **Messaging & Contacts Adapter Update**:
+   - Refactor `MessagingDispatcher.kt` to send SMS using system Intent delegation (`Intent.ACTION_SENDTO`) without requiring `SEND_SMS`.
+   - Refactor `ContactResolver.kt` to remove direct database queries on `ContactsContract` that require `READ_CONTACTS`.
+3. **Secure Storage Hardening (`SecurePreferencesManager.kt`)**:
+   - Verify AES-256 GCM encryption via Android Keystore `MasterKeys` / `MasterKey.Builder`.
+   - Ensure cleartext fallback keys are strictly avoided.
+4. **Network & Logging Cleanup**:
+   - Mask `Authorization` headers in OkHttp logging interceptors.
+5. **Build Verification**:
+   - Run `compile_applet` to confirm zero compilation or lint errors.

@@ -11,7 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Mic
-import androidx.compose.material.icons.filled.People
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,22 +40,10 @@ fun AssistantSettingsScreen(
         )
     }
 
-    var hasContactsPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
-        )
-    }
-
     val micPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         hasMicPermission = isGranted
-    }
-
-    val contactsPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        hasContactsPermission = isGranted
     }
 
     Scaffold(
@@ -168,44 +156,35 @@ fun AssistantSettingsScreen(
                         isGranted = hasMicPermission,
                         onRequest = { micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO) }
                     )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    PermissionRow(
-                        icon = Icons.Default.People,
-                        title = "Contacts Access",
-                        isGranted = hasContactsPermission,
-                        onRequest = { contactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS) }
-                    )
                 }
             }
 
-            // Android System Limitations Explanation Card
+            // Play Protect & Security Compliance Card
             Card(
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
-                            imageVector = Icons.Default.Info,
+                            imageVector = Icons.Default.Security,
                             contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onTertiaryContainer
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Android System & Privacy Policies",
+                            text = "Google Play Protect & Privacy Compliance",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onTertiaryContainer
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "• Screen-off Listening: Android strictly restricts continuous background microphone access during screen-off states to protect user privacy and battery life.\n" +
-                                "• Foreground Notification: When 'Hey Max' continuous wake-word detection is turned on, Android displays an active microphone notification badge.\n" +
-                                "• Messaging Safety: External messaging apps (WhatsApp, Instagram, Messenger) require explicitly pre-filled message review before sending.",
+                        text = "• Zero-Permission Intent Dispatch: SMS and contact selections rely on standard Android system intents without broad SMS/Contact database access.\n" +
+                                "• Android Keystore Key Storage: API credentials are stored securely using hardware-backed EncryptedSharedPreferences.\n" +
+                                "• On-Device Microphone Processing: Audio captured during voice assistant activation is processed locally on-device and never uploaded to background servers.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onTertiaryContainer
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
                     )
                 }
             }

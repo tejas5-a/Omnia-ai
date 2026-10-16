@@ -117,6 +117,7 @@ class MainActivity : ComponentActivity() {
                     val assistantState by voiceAssistantManager.assistantState.collectAsState()
                     val transcript by voiceAssistantManager.lastTranscript.collectAsState()
                     val spokenText by voiceAssistantManager.spokenText.collectAsState()
+                    val listeningRemainingSeconds by voiceAssistantManager.listeningRemainingSeconds.collectAsState()
 
                     var pendingMessageCommand by remember { mutableStateOf<AssistantCommand.PrepareMessage?>(null) }
                     var resolvedContacts by remember { mutableStateOf<List<ResolvedContact>>(emptyList()) }
@@ -348,6 +349,7 @@ class MainActivity : ComponentActivity() {
                                     assistantState = assistantState,
                                     transcript = transcript,
                                     spokenText = spokenText,
+                                    listeningRemainingSeconds = listeningRemainingSeconds,
                                     pendingMessageCommand = pendingMessageCommand,
                                     resolvedContacts = resolvedContacts,
                                     lastExecutionResult = lastExecutionResult,

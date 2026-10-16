@@ -6,7 +6,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,13 +14,13 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -31,7 +30,6 @@ import androidx.compose.ui.unit.sp
 import com.example.assistant.model.AssistantCommand
 import com.example.assistant.model.AssistantState
 import com.example.assistant.model.CommandExecutionResult
-import com.example.assistant.model.MessagingPlatform
 import com.example.assistant.model.ResolvedContact
 import com.example.ui.components.AiOrbView
 
@@ -41,6 +39,7 @@ fun AssistantVoiceOverlay(
     assistantState: AssistantState,
     transcript: String,
     spokenText: String,
+    listeningRemainingSeconds: Int = 10,
     pendingMessageCommand: AssistantCommand.PrepareMessage?,
     resolvedContacts: List<ResolvedContact>,
     lastExecutionResult: CommandExecutionResult?,
@@ -144,7 +143,7 @@ fun AssistantVoiceOverlay(
                 // State Banner
                 Text(
                     text = when (assistantState) {
-                        AssistantState.LISTENING -> "Listening... Speak your command"
+                        AssistantState.LISTENING -> "Listening... (${listeningRemainingSeconds}s)"
                         AssistantState.PROCESSING -> "Processing command..."
                         AssistantState.SPEAKING -> "Speaking response..."
                         AssistantState.CONFIRMATION_REQUIRED -> "Confirmation Required"
@@ -156,6 +155,33 @@ fun AssistantVoiceOverlay(
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.SemiBold
                 )
+
+                // Countdown Timer Chip when Listening
+                if (assistantState == AssistantState.LISTENING) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Surface(
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        contentColor = MaterialTheme.colorScheme.onErrorContainer
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Timer,
+                                contentDescription = "Timeout Timer",
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Auto-stop in ${listeningRemainingSeconds}s",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
 
                 // Live Speech Transcript
                 if (transcript.isNotBlank()) {

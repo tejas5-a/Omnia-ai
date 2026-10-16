@@ -9,8 +9,15 @@ import android.speech.SpeechRecognizer
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import com.example.assistant.model.AssistantState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import java.util.Locale
 
 class VoiceAssistantManager(private val context: Context) : TextToSpeech.OnInitListener {
@@ -19,8 +26,14 @@ class VoiceAssistantManager(private val context: Context) : TextToSpeech.OnInitL
     private var textToSpeech: TextToSpeech? = null
     private var isTtsReady = false
 
+    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var timeoutJob: Job? = null
+
     private val _assistantState = MutableStateFlow(AssistantState.IDLE)
     val assistantState: StateFlow<AssistantState> = _assistantState
+
+    private val _listeningRemainingSeconds = MutableStateFlow(10)
+    val listeningRemainingSeconds: StateFlow<Int> = _listeningRemainingSeconds
 
     private val _spokenText = MutableStateFlow("")
     val spokenText: StateFlow<String> = _spokenText
@@ -61,7 +74,7 @@ class VoiceAssistantManager(private val context: Context) : TextToSpeech.OnInitL
         }
     }
 
-    fun startListening() {
+    fun startListening(timeoutSeconds: Int = 10) {
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
             _spokenText.value = "Speech recognition is unavailable on this device."
             _assistantState.value = AssistantState.ERROR
@@ -70,26 +83,43 @@ class VoiceAssistantManager(private val context: Context) : TextToSpeech.OnInitL
 
         stopListening()
 
+        _assistantState.value = AssistantState.LISTENING
+        _listeningRemainingSeconds.value = timeoutSeconds
+
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
             setRecognitionListener(object : RecognitionListener {
                 override fun onReadyForSpeech(params: Bundle?) {
                     _assistantState.value = AssistantState.LISTENING
                     _lastTranscript.value = ""
+                    startListeningTimeout(timeoutSeconds)
                 }
 
-                override fun onBeginningOfSpeech() {}
+                override fun onBeginningOfSpeech() {
+                    cancelTimeoutTimer()
+                }
+
                 override fun onRmsChanged(rmsdB: Float) {}
                 override fun onBufferReceived(buffer: ByteArray?) {}
+
                 override fun onEndOfSpeech() {
+                    cancelTimeoutTimer()
                     _assistantState.value = AssistantState.PROCESSING
                 }
 
                 override fun onError(error: Int) {
+                    cancelTimeoutTimer()
                     _assistantState.value = AssistantState.IDLE
-                    _spokenText.value = "Listening error ($error). Tap to try again."
+                    val errorMessage = when (error) {
+                        SpeechRecognizer.ERROR_NO_MATCH -> "No speech recognized."
+                        SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "Listening timed out."
+                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone permission required."
+                        else -> "Listening error ($error)."
+                    }
+                    _spokenText.value = "$errorMessage Tap mic to try again."
                 }
 
                 override fun onResults(results: Bundle?) {
+                    cancelTimeoutTimer()
                     val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                     val text = matches?.firstOrNull().orEmpty()
                     if (text.isNotBlank()) {
@@ -104,6 +134,7 @@ class VoiceAssistantManager(private val context: Context) : TextToSpeech.OnInitL
                     val partial = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
                     if (!partial.isNullOrBlank()) {
                         _lastTranscript.value = partial
+                        cancelTimeoutTimer()
                     }
                 }
 
@@ -117,16 +148,53 @@ class VoiceAssistantManager(private val context: Context) : TextToSpeech.OnInitL
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         }
 
-        speechRecognizer?.startListening(intent)
+        startListeningTimeout(timeoutSeconds)
+
+        try {
+            speechRecognizer?.startListening(intent)
+        } catch (e: Exception) {
+            cancelTimeoutTimer()
+            _assistantState.value = AssistantState.ERROR
+            _spokenText.value = "Failed to start speech recognition."
+        }
+    }
+
+    private fun startListeningTimeout(timeoutSeconds: Int) {
+        cancelTimeoutTimer()
+        _listeningRemainingSeconds.value = timeoutSeconds
+        timeoutJob = scope.launch {
+            for (sec in timeoutSeconds downTo 1) {
+                _listeningRemainingSeconds.value = sec
+                delay(1000L)
+                if (_assistantState.value != AssistantState.LISTENING) {
+                    return@launch
+                }
+            }
+            _listeningRemainingSeconds.value = 0
+            if (_assistantState.value == AssistantState.LISTENING) {
+                _spokenText.value = "Listening timed out after ${timeoutSeconds}s."
+                stopListening()
+                _assistantState.value = AssistantState.IDLE
+            }
+        }
+    }
+
+    fun cancelTimeoutTimer() {
+        timeoutJob?.cancel()
+        timeoutJob = null
     }
 
     fun stopListening() {
+        cancelTimeoutTimer()
         try {
             speechRecognizer?.stopListening()
             speechRecognizer?.destroy()
             speechRecognizer = null
         } catch (e: Exception) {
             // Ignore
+        }
+        if (_assistantState.value == AssistantState.LISTENING) {
+            _assistantState.value = AssistantState.IDLE
         }
     }
 
@@ -153,6 +221,8 @@ class VoiceAssistantManager(private val context: Context) : TextToSpeech.OnInitL
     }
 
     fun destroy() {
+        cancelTimeoutTimer()
+        scope.cancel()
         stopListening()
         textToSpeech?.stop()
         textToSpeech?.shutdown()
