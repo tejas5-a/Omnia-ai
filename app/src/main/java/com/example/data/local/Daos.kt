@@ -109,6 +109,43 @@ interface WorkflowDao {
 }
 
 @Dao
+interface AutomationDao {
+    @Query("SELECT * FROM automations ORDER BY updatedAt DESC")
+    fun getAllAutomations(): Flow<List<AutomationEntity>>
+
+    @Query("SELECT * FROM automations ORDER BY updatedAt DESC")
+    suspend fun getAllAutomationsSync(): List<AutomationEntity>
+
+    @Query("SELECT * FROM automations WHERE id = :id LIMIT 1")
+    suspend fun getAutomationById(id: String): AutomationEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAutomation(automation: AutomationEntity)
+
+    @Update
+    suspend fun updateAutomation(automation: AutomationEntity)
+
+    @Query("UPDATE automations SET isEnabled = :isEnabled WHERE id = :id")
+    suspend fun setEnabled(id: String, isEnabled: Boolean)
+
+    @Query("DELETE FROM automations WHERE id = :id")
+    suspend fun deleteAutomation(id: String)
+
+    @Query("SELECT * FROM automation_run_logs ORDER BY timestamp DESC")
+    fun getAllRunLogs(): Flow<List<AutomationRunLogEntity>>
+
+    @Query("SELECT * FROM automation_run_logs WHERE automationId = :automationId ORDER BY timestamp DESC")
+    fun getRunLogsForAutomation(automationId: String): Flow<List<AutomationRunLogEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertRunLog(log: AutomationRunLogEntity)
+
+    @Query("DELETE FROM automation_run_logs")
+    suspend fun clearRunLogs()
+}
+
+
+@Dao
 interface DocumentDao {
     @Query("SELECT * FROM documents ORDER BY timestamp DESC")
     fun getAllDocuments(): Flow<List<DocumentEntity>>

@@ -92,6 +92,39 @@ data class WorkflowRunLogEntity(
     val timestamp: Long
 )
 
+@Entity(tableName = "automations")
+data class AutomationEntity(
+    @PrimaryKey val id: String,
+    val name: String,
+    val description: String,
+    val iconName: String,
+    val isEnabled: Boolean,
+    val triggerType: String,
+    val triggerConfigJson: String,
+    val conditionsJson: String,
+    val actionsJson: String,
+    val targetApp: String,
+    val lastRunMs: Long,
+    val runCount: Int,
+    val successCount: Int,
+    val failureCount: Int,
+    val createdAt: Long,
+    val updatedAt: Long
+)
+
+@Entity(tableName = "automation_run_logs")
+data class AutomationRunLogEntity(
+    @PrimaryKey val id: String,
+    val automationId: String,
+    val automationName: String,
+    val status: String,
+    val stepResultsJson: String,
+    val outputSummary: String,
+    val durationMs: Long,
+    val timestamp: Long
+)
+
+
 @Entity(tableName = "documents")
 data class DocumentEntity(
     @PrimaryKey val id: String,

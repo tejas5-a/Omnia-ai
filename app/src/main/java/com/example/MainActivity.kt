@@ -13,26 +13,11 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import com.example.assistant.engine.AssistantCommandParser
-import com.example.assistant.engine.DeviceControlExecutor
-import com.example.assistant.engine.VoiceAssistantManager
-import com.example.assistant.messaging.ContactResolver
-import com.example.assistant.messaging.MessagingDispatcher
-import com.example.assistant.model.AssistantCommand
-import com.example.assistant.model.AssistantState
-import com.example.assistant.model.CommandExecutionResult
-import com.example.assistant.model.ResolvedContact
-import com.example.assistant.ui.AssistantSettingsScreen
-import com.example.assistant.ui.AssistantVoiceOverlay
 import com.example.data.local.AppDatabase
 import com.example.data.local.SecurePreferencesManager
 import com.example.data.repository.*
@@ -59,15 +44,15 @@ import com.example.ui.screens.workflows.WorkflowScreen
 import com.example.ui.screens.workflows.WorkflowViewModel
 import com.example.ui.screens.workspace.WorkspaceScreen
 import com.example.ui.screens.workspace.WorkspaceViewModel
+import com.example.ui.screens.automations.AutomationLogsScreen
+import com.example.ui.screens.automations.AutomationsDashboardScreen
+import com.example.ui.screens.automations.AutomationsViewModel
+import com.example.ui.screens.automations.TemplateGalleryScreen
+import com.example.ui.screens.automations.WorkflowEditorScreen
 import com.example.ui.theme.OmniaMaxTheme
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
-
-    private lateinit var voiceAssistantManager: VoiceAssistantManager
-    private lateinit var deviceControlExecutor: DeviceControlExecutor
-    private lateinit var contactResolver: ContactResolver
-    private lateinit var messagingDispatcher: MessagingDispatcher
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,11 +66,6 @@ class MainActivity : ComponentActivity() {
         val providerRepository = ProviderRepository(database.providerDao(), securePrefs, appPrefs)
         val agentRepository = AgentRepository(database.agentTaskDao())
         val memoryRepository = MemoryRepository(database.memoryDao())
-
-        deviceControlExecutor = DeviceControlExecutor(applicationContext)
-        contactResolver = ContactResolver(applicationContext)
-        messagingDispatcher = MessagingDispatcher(applicationContext)
-        voiceAssistantManager = VoiceAssistantManager(applicationContext)
 
         setContent {
             val settingsViewModel = remember { SettingsViewModel(chatRepository, providerRepository, appPrefs) }
@@ -105,51 +85,13 @@ class MainActivity : ComponentActivity() {
                     val knowledgeViewModel = remember { KnowledgeViewModel(database.documentDao(), providerRepository) }
                     val memoryViewModel = remember { MemoryViewModel(memoryRepository) }
                     val pluginsViewModel = remember { PluginsViewModel() }
+                    val automationsViewModel = remember { AutomationsViewModel(application) }
 
                     val chatUiState by chatViewModel.uiState.collectAsState()
 
                     var currentScreen by remember { mutableStateOf("welcome") }
                     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                     val scope = rememberCoroutineScope()
-
-                    // Voice Assistant State
-                    var isAssistantOverlayVisible by remember { mutableStateOf(false) }
-                    val assistantState by voiceAssistantManager.assistantState.collectAsState()
-                    val transcript by voiceAssistantManager.lastTranscript.collectAsState()
-                    val spokenText by voiceAssistantManager.spokenText.collectAsState()
-                    val listeningRemainingSeconds by voiceAssistantManager.listeningRemainingSeconds.collectAsState()
-
-                    var pendingMessageCommand by remember { mutableStateOf<AssistantCommand.PrepareMessage?>(null) }
-                    var resolvedContacts by remember { mutableStateOf<List<ResolvedContact>>(emptyList()) }
-                    var lastExecutionResult by remember { mutableStateOf<CommandExecutionResult?>(null) }
-
-                    // Voice Assistant Command Callback
-                    voiceAssistantManager.onCommandRecognized = { text ->
-                        val command = AssistantCommandParser.parseCommand(text)
-                        when (command) {
-                            is AssistantCommand.PrepareMessage -> {
-                                pendingMessageCommand = command
-                                resolvedContacts = contactResolver.resolveContact(command.recipientName)
-                                voiceAssistantManager.setState(AssistantState.CONFIRMATION_REQUIRED)
-                                voiceAssistantManager.speak("Ready to send message to ${command.recipientName} on ${command.platform.displayName}. Say Send or tap button to confirm.")
-                            }
-                            is AssistantCommand.GeneralAIQuery -> {
-                                voiceAssistantManager.setState(AssistantState.PROCESSING)
-                                chatViewModel.sendMessage(command.prompt)
-                                voiceAssistantManager.speak("Asking MAX AI for ${command.prompt}")
-                                lastExecutionResult = CommandExecutionResult(true, "Query sent to MAX AI", "Processing AI response.")
-                                voiceAssistantManager.setState(AssistantState.SUCCESS)
-                            }
-                            else -> {
-                                val result = deviceControlExecutor.execute(command)
-                                lastExecutionResult = result
-                                if (result.spokenResponse.isNotBlank()) {
-                                    voiceAssistantManager.speak(result.spokenResponse)
-                                }
-                                voiceAssistantManager.setState(if (result.isSuccess) AssistantState.SUCCESS else AssistantState.ERROR)
-                            }
-                        }
-                    }
 
                     BackHandler(enabled = drawerState.isOpen || currentScreen != "home") {
                         if (drawerState.isOpen) {
@@ -194,7 +136,7 @@ class MainActivity : ComponentActivity() {
                             Box(modifier = Modifier.fillMaxSize()) {
                                 Scaffold(
                                     bottomBar = {
-                                        if (currentScreen in listOf("home", "chat", "agents", "settings", "assistant_settings")) {
+                                        if (currentScreen in listOf("home", "chat", "agents", "automations", "settings")) {
                                             NavigationBar(
                                                 containerColor = MaterialTheme.colorScheme.surface
                                             ) {
@@ -203,6 +145,12 @@ class MainActivity : ComponentActivity() {
                                                     onClick = { currentScreen = "home" },
                                                     icon = { Icon(Icons.Default.Home, contentDescription = "Home") },
                                                     label = { Text("Home") }
+                                                )
+                                                NavigationBarItem(
+                                                    selected = currentScreen == "automations",
+                                                    onClick = { currentScreen = "automations" },
+                                                    icon = { Icon(Icons.Default.Bolt, contentDescription = "Automations") },
+                                                    label = { Text("Automations") }
                                                 )
                                                 NavigationBarItem(
                                                     selected = currentScreen == "chat",
@@ -215,12 +163,6 @@ class MainActivity : ComponentActivity() {
                                                     onClick = { currentScreen = "agents" },
                                                     icon = { Icon(Icons.Default.SmartToy, contentDescription = "Agents") },
                                                     label = { Text("Agents") }
-                                                )
-                                                NavigationBarItem(
-                                                    selected = currentScreen == "assistant_settings",
-                                                    onClick = { currentScreen = "assistant_settings" },
-                                                    icon = { Icon(Icons.Default.Mic, contentDescription = "Assistant") },
-                                                    label = { Text("MAX Voice") }
                                                 )
                                                 NavigationBarItem(
                                                     selected = currentScreen == "settings",
@@ -259,6 +201,7 @@ class MainActivity : ComponentActivity() {
                                                     },
                                                     onOpenService = { service ->
                                                         when (service) {
+                                                            "MAX Automations", "automations" -> currentScreen = "automations"
                                                             "AI Chat", "chat" -> currentScreen = "chat"
                                                             "Deep Research", "agents" -> currentScreen = "agents"
                                                             "Code Assistant", "workspace" -> currentScreen = "workspace"
@@ -268,6 +211,24 @@ class MainActivity : ComponentActivity() {
                                                         }
                                                     },
                                                     onOpenSettings = { currentScreen = "settings" }
+                                                )
+                                                "automations" -> AutomationsDashboardScreen(
+                                                    viewModel = automationsViewModel,
+                                                    onNavigateToEditor = { currentScreen = "automations_editor" },
+                                                    onNavigateToTemplates = { currentScreen = "automations_templates" },
+                                                    onNavigateToLogs = { currentScreen = "automations_logs" }
+                                                )
+                                                "automations_editor" -> WorkflowEditorScreen(
+                                                    viewModel = automationsViewModel,
+                                                    onNavigateBack = { currentScreen = "automations" }
+                                                )
+                                                "automations_templates" -> TemplateGalleryScreen(
+                                                    viewModel = automationsViewModel,
+                                                    onNavigateBack = { currentScreen = "automations" }
+                                                )
+                                                "automations_logs" -> AutomationLogsScreen(
+                                                    viewModel = automationsViewModel,
+                                                    onNavigateBack = { currentScreen = "automations" }
                                                 )
                                                 "chat" -> ChatScreen(
                                                     viewModel = chatViewModel,
@@ -309,82 +270,16 @@ class MainActivity : ComponentActivity() {
                                                     viewModel = settingsViewModel,
                                                     onNavigateBack = { currentScreen = "home" }
                                                 )
-                                                "assistant_settings" -> AssistantSettingsScreen(
-                                                    onNavigateBack = { currentScreen = "home" }
-                                                )
                                             }
                                         }
                                     }
                                 }
-
-                                // Floating Mic Button to trigger MAX Assistant Overlay
-                                if (currentScreen in listOf("home", "chat", "agents")) {
-                                    FloatingActionButton(
-                                        onClick = {
-                                            isAssistantOverlayVisible = !isAssistantOverlayVisible
-                                            if (isAssistantOverlayVisible) {
-                                                voiceAssistantManager.startListening()
-                                            } else {
-                                                voiceAssistantManager.stopListening()
-                                            }
-                                        },
-                                        containerColor = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier
-                                            .align(Alignment.BottomEnd)
-                                            .padding(end = 16.dp, bottom = 80.dp)
-                                            .size(56.dp),
-                                        shape = CircleShape
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Mic,
-                                            contentDescription = "Trigger MAX Personal Assistant",
-                                            tint = MaterialTheme.colorScheme.onPrimary
-                                        )
-                                    }
-                                }
-
-                                // MAX Assistant Bottom Overlay
-                                AssistantVoiceOverlay(
-                                    isVisible = isAssistantOverlayVisible,
-                                    assistantState = assistantState,
-                                    transcript = transcript,
-                                    spokenText = spokenText,
-                                    listeningRemainingSeconds = listeningRemainingSeconds,
-                                    pendingMessageCommand = pendingMessageCommand,
-                                    resolvedContacts = resolvedContacts,
-                                    lastExecutionResult = lastExecutionResult,
-                                    onStartListening = { voiceAssistantManager.startListening() },
-                                    onStopListening = { voiceAssistantManager.stopListening() },
-                                    onConfirmSendMessage = { contact, messageText ->
-                                        pendingMessageCommand?.let { cmd ->
-                                            val result = messagingDispatcher.dispatchMessage(cmd.platform, contact, messageText)
-                                            lastExecutionResult = result
-                                            voiceAssistantManager.speak(result.spokenResponse)
-                                            pendingMessageCommand = null
-                                            voiceAssistantManager.setState(if (result.isSuccess) AssistantState.SUCCESS else AssistantState.ERROR)
-                                        }
-                                    },
-                                    onCancelMessage = {
-                                        pendingMessageCommand = null
-                                        voiceAssistantManager.speak("Message cancelled.")
-                                        voiceAssistantManager.setState(AssistantState.IDLE)
-                                    },
-                                    onDismiss = {
-                                        isAssistantOverlayVisible = false
-                                        voiceAssistantManager.stopListening()
-                                    },
-                                    modifier = Modifier.align(Alignment.BottomCenter)
-                                )
                             }
                         }
                     }
+
                 }
             }
         }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        voiceAssistantManager.destroy()
     }
 }

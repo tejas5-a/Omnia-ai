@@ -15,9 +15,11 @@ import androidx.room.TypeConverters
         ProjectMemoryEntity::class,
         WorkflowEntity::class,
         WorkflowRunLogEntity::class,
+        AutomationEntity::class,
+        AutomationRunLogEntity::class,
         DocumentEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = false
 )
 @TypeConverters(RoomConverters::class)
@@ -27,7 +29,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun agentTaskDao(): AgentTaskDao
     abstract fun memoryDao(): MemoryDao
     abstract fun workflowDao(): WorkflowDao
+    abstract fun automationDao(): AutomationDao
     abstract fun documentDao(): DocumentDao
+
 
     companion object {
         @Volatile

@@ -165,7 +165,16 @@ fun DrawerContent(
             HorizontalDivider(modifier = Modifier.padding(vertical = 6.dp))
 
             // Suite Links List
-            LazyColumn(modifier = Modifier.height(200.dp)) {
+            LazyColumn(modifier = Modifier.height(240.dp)) {
+                item {
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Bolt, contentDescription = null, modifier = Modifier.size(18.dp), tint = Color(0xFF00F2FE)) },
+                        label = { Text("MAX Automations", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00F2FE)) },
+                        selected = false,
+                        onClick = { onNavigate("automations") },
+                        modifier = Modifier.height(40.dp)
+                    )
+                }
                 item {
                     NavigationDrawerItem(
                         icon = { Icon(Icons.Default.Compare, contentDescription = null, modifier = Modifier.size(18.dp)) },
@@ -175,6 +184,7 @@ fun DrawerContent(
                         modifier = Modifier.height(40.dp)
                     )
                 }
+
                 item {
                     NavigationDrawerItem(
                         icon = { Icon(Icons.Default.SmartToy, contentDescription = null, modifier = Modifier.size(18.dp)) },

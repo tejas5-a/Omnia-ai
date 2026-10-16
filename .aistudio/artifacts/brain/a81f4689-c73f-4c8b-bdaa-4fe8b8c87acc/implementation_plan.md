@@ -1,94 +1,148 @@
-# OMNIA MAX — Security Audit & Google Play Protect Hardening Plan
+# MAX AUTOMATIONS — Ultimate Cross-App Automation System
 
-This plan performs a complete security audit of OMNIA MAX to eliminate potential Google Play Protect high-risk detection flags, enforce zero-trust privacy controls, remove excessive permissions, secure API keys, and harden the application for safe release.
+Upgrade OMNIA MAX with **MAX AUTOMATIONS**, a production-oriented cross-app automation platform allowing users to create, schedule, customize, and execute multi-step workflows across popular Android applications (WhatsApp, Instagram, YouTube, Telegram, X, Facebook, Gmail, Chrome, Spotify) and external integrations, wrapped in OMNIA MAX's signature sci-fi UI identity.
 
----
-
-> [!IMPORTANT] User Review & Critical Decisions
->
-> 1. **Permission Reduction (Principle of Least Privilege)**:
->    - **Root Cause of Play Protect Warning**: Combining `SEND_SMS`, `READ_CONTACTS`, `RECORD_AUDIO`, and `FOREGROUND_SERVICE_MICROPHONE` in an app that is not a default SMS handler triggers Google Play Protect's spyware/data-harvesting heuristic flags.
->    - **Fix**: Remove `android.permission.SEND_SMS` and `android.permission.READ_CONTACTS` from `AndroidManifest.xml`.
->    - **Replacement**: Use zero-permission Android system `Intent.ACTION_SENDTO` (with `smsto:` payload) for SMS dispatch, and `ActivityResultContracts.PickContact()` for recipient selection.
-> 2. **Privacy-First Microphone & Wake-Word Consent**:
->    - Require explicit opt-in user consent card before enabling `MaxWakeWordService`.
->    - Display an un-dismissable foreground notification badge with a prominent "Turn Off" button while the microphone listener is active.
->    - Ensure raw audio is processed strictly on-device for wake-word matching and never recorded or uploaded to remote servers.
-> 3. **API Key & Network Security**:
->    - Store OpenRouter and provider API keys in Android Keystore-backed `EncryptedSharedPreferences`.
->    - Suppress sensitive key headers from HTTP logging interceptors in release builds.
+> [!IMPORTANT]
+> **Strict AI Assistant Removal Preservation**: As mandated, the AI assistant functionality remains completely removed. MAX AUTOMATIONS is purely a deterministic, user-controlled cross-app workflow automation engine using Android intents, deep links, share sheet delegates, background scheduling, webhooks, and official APIs.
 
 ---
 
-## 1. Security Audit Findings & Vulnerability Analysis
+## User Review & Critical Decisions
 
-| Audit Area | Findings & Risk Level | Remediation Action |
-| :--- | :--- | :--- |
-| **Permissions** | **HIGH RISK**: `SEND_SMS` & `READ_CONTACTS` combined with background microphone permission triggers Play Protect malware heuristics. | Remove `SEND_SMS` and `READ_CONTACTS` from Manifest. Replace with system `Intent.ACTION_SENDTO` and contact pickers. |
-| **Microphone / Wake-Word** | **MEDIUM RISK**: `MaxWakeWordService` starts without prior consent dialog. | Implement explicit Privacy Consent Modal prior to activating background service. |
-| **API Key Credentials** | **MEDIUM RISK**: Direct API key storage in plaintext SharedPreferences risks credential leakage. | Enforce `EncryptedSharedPreferences` backed by Android Keystore. Mask API keys in logs. |
-| **Network Requests** | **LOW RISK**: Ensure all API calls use HTTPS with valid TLS certificates. | Validate Retrofit/OkHttp HTTPS endpoints for OpenRouter and Gemini API gateway. |
-| **Exported Components** | **LOW RISK**: `MainActivity` is exported for launcher; `MaxWakeWordService` is non-exported (`android:exported="false"`). | Retain non-exported guard on background service. |
+- **Confirmed Decision 1 (Triggers)**: Hybrid trigger execution model supporting **Manual execution**, **Scheduled time/date**, **System events** (battery, connectivity), and **Webhooks**.
+- **Confirmed Decision 2 (App Integrations)**: Direct app actions via Android Intents, Deep Links, and Android Share Sheet as default; official APIs as advanced options; explicit user confirmation as safeguard for consequential actions.
+- **Confirmed Decision 3 (Dashboard Aesthetic)**: OMNIA MAX sci-fi dark posture (deep navy `#0B0F19`, glass cards with subtle glowing borders, cyan `#00F2FE` and electric violet `#7F00FF` accents).
 
 ---
 
-## 2. User Experience & Privacy Safeguards
+## 1. Overview & Core Concept
 
-- **Permission Rationale Dialogs**:
-  - When the user triggers voice assistant features, present clear Compose rationale dialogs explaining why microphone access is required.
-  - If permissions are denied, degrade gracefully to text input mode without crashing.
-- **Microphone Privacy Indicator**:
-  - Display active microphone state on the `AiOrbView` UI and in the persistent system notification bar.
-  - Provide a one-tap "Stop Listening" action in both the UI and notification.
+**MAX AUTOMATIONS** delivers cross-app automation for Android power users:
+- **Visual Workflow Builder**: Structured `WHEN -> IF -> THEN -> REVIEW -> SAVE` flow for creating deterministic rules.
+- **Universal App Integrations**: Native Intent handlers, deep-link triggers, share sheet preparers, and official API integration adapters for WhatsApp, YouTube, Telegram, Instagram, X, Facebook, Gmail, Chrome, Spotify, and generic Android apps.
+- **Robust Background Execution**: Time-zone aware scheduling via `WorkManager` and `AlarmManager` with Doze-mode compatibility and idempotency execution tracking.
+- **Integrations & Webhook Center**: Configuration hub for Webhook endpoints, OAuth tokens, and API credential management.
 
 ---
 
-## 3. Technical Architecture & Security Flow
+## 2. User Experience & Visual Design
 
+### Dashboard Layout & Navigation
+- **Header Stat Cards**: Total Automations, Active/Paused count, Execution Success Rate, Last Triggered timestamp.
+- **Filter & Search Bar**: Search by workflow name, filter by status (`All`, `Active`, `Scheduled`, `Paused`) or target app (`WhatsApp`, `YouTube`, `Telegram`, etc.), and sort by date or execution count.
+- **Workflow Cards**: Glassmorphism cards featuring app icons, trigger badge, action chain overview, enabled toggle switch, execution status pill, and quick action menu (`Edit`, `Run Now`, `Duplicate`, `Export`, `Delete`).
+- **Template Gallery**: Pre-built one-tap templates (Daily Reminder, YouTube Routine, Study Focus, Social Share, Prepared Email Draft, Webhook Bridge).
+
+### Visual Workflow Builder (`WHEN -> IF -> THEN -> REVIEW -> SAVE`)
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                        USER INPUT / VOICE COMMAND                      │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                    ZERO-PERMISSION INTENT DELEGATION                   │
-│   - SMS: Intent.ACTION_SENDTO (smsto:uri) -> Direct System Composer      │
-│   - Contacts: ActivityResultContracts.PickContact()                    │
-│   - Social Apps: Native Share/Message Intents                          │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                     ANDROID KEYSTORE SECRET STORE                      │
-│   - EncryptedSharedPreferences (MasterKey AES-256)                    │
-│   - Redacted OkHttp Logging Headers (Authorization: Bearer ***)        │
-└───────────────────────────────────┬────────────────────────────────────┘
-                                    │
-                                    ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                 PRIVACY-FIRST FOREGROUND SERVICE                       │
-│   - MaxWakeWordService (Non-Exported)                                  │
-│   - User Opt-In Consent Verification                                  │
-│   - On-Device Audio Processing                                         │
-└────────────────────────────────────────────────────────────────────────┘
+│                        VISUAL WORKFLOW BUILDER                        │
+├───────────────┬───────────────┬───────────────┬───────────────┬────────┤
+│    1. WHEN    │    2. IF      │    3. THEN    │   4. REVIEW   │ 5. SAVE│
+│   (Trigger)   │  (Condition)  │   (Actions)   │   (Confirm)   │ (Done) │
+└───────┬───────┴───────┬───────┴───────┬───────┴───────┬───────┴────────┘
+        │               │               │               │
+        ▼               ▼               ▼               ▼
+┌──────────────┐┌──────────────┐┌──────────────┐┌──────────────┐
+│• Manual Tap  ││• Time/Day    ││• Open App    ││• Permission  │
+│• Scheduled   ││• Battery %   ││• Deep Link   ││  Validation │
+│• System Event││• Wi-Fi State ││• Share Text  ││• Safeguard   │
+│• Webhook     ││• App State   ││• Compose Msg ││  Prompt Check│
+└──────────────┘└──────────────┘└──────────────┘└──────────────┘
 ```
 
 ---
 
-## 4. Implementation Steps
+## 3. Technical Architecture & Component Hierarchy
 
-1. **Manifest Hardening (`AndroidManifest.xml`)**:
-   - Remove `<uses-permission android:name="android.permission.SEND_SMS" />`
-   - Remove `<uses-permission android:name="android.permission.READ_CONTACTS" />`
-   - Verify all remaining permissions (`RECORD_AUDIO`, `INTERNET`, `ACCESS_NETWORK_STATE`, `FLASHLIGHT`, `POST_NOTIFICATIONS`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MICROPHONE`).
-2. **Messaging & Contacts Adapter Update**:
-   - Refactor `MessagingDispatcher.kt` to send SMS using system Intent delegation (`Intent.ACTION_SENDTO`) without requiring `SEND_SMS`.
-   - Refactor `ContactResolver.kt` to remove direct database queries on `ContactsContract` that require `READ_CONTACTS`.
-3. **Secure Storage Hardening (`SecurePreferencesManager.kt`)**:
-   - Verify AES-256 GCM encryption via Android Keystore `MasterKeys` / `MasterKey.Builder`.
-   - Ensure cleartext fallback keys are strictly avoided.
-4. **Network & Logging Cleanup**:
-   - Mask `Authorization` headers in OkHttp logging interceptors.
-5. **Build Verification**:
-   - Run `compile_applet` to confirm zero compilation or lint errors.
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           UI LAYER (Jetpack Compose)                            │
+├───────────────────────────────┬─────────────────────────────────────────────────┤
+│ AutomationsDashboardScreen    │ VisualWorkflowBuilderScreen                     │
+│ IntegrationsCenterScreen      │ ExecutionHistoryScreen                          │
+└───────────────┬───────────────┴────────────────────────┬────────────────────────┘
+                │                                        │
+                ▼                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                          VIEWMODEL & ENGINE LAYER                               │
+├───────────────────────────────┬─────────────────────────────────────────────────┤
+│ AutomationsViewModel          │ AutomationExecutionEngine                       │
+│ TriggerRegistry               │ ConditionEvaluator                              │
+│ ActionRegistry                │ AppIntegrationFramework                         │
+└───────────────┬───────────────┴────────────────────────┬────────────────────────┘
+                │                                        │
+                ▼                                        ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    PERSISTENCE & SCHEDULING DATA LAYER                          │
+├───────────────────────────────┬─────────────────────────────────────────────────┤
+│ Room AppDatabase (Workflows)  │ WorkManager Scheduler                           │
+│ SecurePreferencesManager      │ Intent & DeepLink Dispatcher                    │
+└───────────────────────────────┴─────────────────────────────────────────────────┘
+```
+
+### Data Models & Room Schema
+
+1. **`AutomationEntity`** (`automations` table):
+   - `id`: String (UUID)
+   - `name`: String
+   - `description`: String
+   - `isEnabled`: Boolean
+   - `triggerJson`: String (Serialized `AutomationTrigger`)
+   - `conditionsJson`: String (Serialized `List<AutomationCondition>`)
+   - `actionsJson`: String (Serialized `List<AutomationAction>`)
+   - `targetApp`: String (WhatsApp, YouTube, Telegram, Spotify, etc.)
+   - `createdAt`: Long
+   - `lastRunAt`: Long
+   - `lastRunStatus`: String (`SUCCESS`, `FAILED`, `SKIPPED`, `WAITING_FOR_USER`, `PERMISSION_REQUIRED`)
+   - `runCount`: Int
+
+2. **`AutomationRunLogEntity`** (`automation_run_logs` table):
+   - `id`: String
+   - `automationId`: String
+   - `automationName`: String
+   - `status`: String
+   - `executionSummary`: String
+   - `timestamp`: Long
+
+---
+
+## 4. Universal App Integration Matrix
+
+| Target Application | Trigger Capabilities | Action Capabilities & System Mechanics | Safeguards & Limitations |
+| :--- | :--- | :--- | :--- |
+| **WhatsApp** | Manual, Scheduled, Webhook | Open Chat Link, Prepare Message, Share Text/Media via Intent | Requires user confirmation to tap Send in WhatsApp. |
+| **YouTube** | Manual, Scheduled Time | Open Video URL, Open Playlist, Watch Later Reminder | Launches official YouTube app/URL. Respects playback limits. |
+| **Telegram** | Manual, Scheduled, Webhook | Open Channel/Chat, Share Text, Official Bot API sendMessage | Tokens stored in SecurePreferencesManager. |
+| **Instagram** | Manual, Scheduled | Open Profile/Reel, Share to Feed/Stories via Share Sheet | Media prepped via Share Sheet. |
+| **X (Twitter)** | Manual, Scheduled, Webhook | Open Profile/Post, Compose Tweet Intent, Share Sheet | Intent opens compose box. |
+| **Facebook** | Manual, Scheduled | Open Page/Group, Share Content via Intent | Uses Android Intent delegates. |
+| **Gmail** | Manual, Scheduled | Compose Draft (`ACTION_SENDTO` / `ACTION_SEND`), Subject & Body | User reviews and sends in Gmail. |
+| **Chrome / Web** | Manual, Scheduled, Webhook | Open Validated URL, Webhook Endpoint Receiver | URL scheme validation (HTTPS/HTTP). |
+| **Spotify** | Manual, Scheduled | Open Track/Album/Playlist Deep Link (`spotify:track:...`) | Deep link opens Spotify. |
+| **Generic Apps** | Manual, Scheduled | Package Launch Intent, Share Sheet, In-App Screen | Checks package installation status first. |
+
+---
+
+## 5. Implementation Phasing & Milestones
+
+1. **Phase 1: Architecture & Data Layer**:
+   - Create models (`AutomationModels.kt`, `AutomationEntity`, `AutomationRunLogEntity`).
+   - Add DAO and Room database migration.
+   - Implement `AutomationRepository`.
+
+2. **Phase 2: App Integration Handlers**:
+   - Create `AppIntegrationFramework.kt` and individual integration drivers (`WhatsAppDriver`, `YouTubeDriver`, `TelegramDriver`, `GmailDriver`, etc.).
+   - Package visibility checks (`packageManager.getLaunchIntentForPackage`).
+
+3. **Phase 3: Execution Engine & Scheduler**:
+   - Create `AutomationExecutionEngine.kt`, `ConditionEvaluator.kt`, and `WorkManager` scheduler task.
+   - Implement idempotency checks and execution log reporting.
+
+4. **Phase 4: Dashboard & Visual Builder UI**:
+   - Implement `AutomationsDashboardScreen.kt`, `VisualWorkflowBuilderScreen.kt`, and `IntegrationsCenterScreen.kt`.
+   - Add template gallery and JSON export/import handlers.
+
+5. **Phase 5: Navigation & MainActivity Integration**:
+   - Add `Automations` to sidebar drawer (`DrawerContent.kt`) and `MainActivity` routes.
+   - Run compilation checks (`compile_applet`).
