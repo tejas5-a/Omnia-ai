@@ -8,7 +8,6 @@ import com.example.data.repository.ChatRepository
 import com.example.data.repository.ProviderRepository
 import com.example.engine.LLMProviderManager
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -18,7 +17,7 @@ data class ChatUiState(
     val messages: List<ChatMessage> = emptyList(),
     val activeProvider: ProviderConfig? = null,
     val availableModels: List<AIModel> = emptyList(),
-    val selectedModelId: String = "gemini-3.6-flash",
+    val selectedModelId: String = "gemini-2.5-flash",
     val isGenerating: Boolean = false,
     val isHighThinking: Boolean = false,
     val systemPromptSheetOpen: Boolean = false,
@@ -35,12 +34,15 @@ class ChatViewModel(
     val uiState: StateFlow<ChatUiState> = _uiState.asStateFlow()
 
     private var generationJob: Job? = null
+    private var messageObserverJob: Job? = null
     private val llmManager = LLMProviderManager { providerRepository.getActiveProvider() }
 
     init {
         viewModelScope.launch {
+            // 1. Ensure providers are initialized before first query
             providerRepository.initializeDefaultProviders()
 
+            // 2. Sync active provider and user preferences
             combine(providerRepository.allProviders, appPrefs.userPreferences) { providers, prefs ->
                 val active = providers.firstOrNull { it.id == prefs.activeProviderId }
                     ?: providers.firstOrNull { it.enabled }
@@ -56,11 +58,13 @@ class ChatViewModel(
                         active.fetchedModels
                     }
 
+                    val effectiveModel = prefs.selectedModelId.ifBlank { active.selectedModel }
+
                     _uiState.update {
                         it.copy(
                             activeProvider = active,
                             availableModels = filteredModels,
-                            selectedModelId = prefs.selectedModelId,
+                            selectedModelId = effectiveModel,
                             isHighThinking = prefs.isHighThinking
                         )
                     }
@@ -68,12 +72,12 @@ class ChatViewModel(
             }
         }
 
+        // 3. Sync chat threads and active thread
         viewModelScope.launch {
             chatRepository.allThreads.collect { threads ->
                 if (threads.isEmpty()) {
-                    val newT = chatRepository.createNewThread(
-                        modelId = appPrefs.userPreferences.value.selectedModelId
-                    )
+                    val defaultModel = appPrefs.userPreferences.value.selectedModelId.ifBlank { "gemini-2.5-flash" }
+                    val newT = chatRepository.createNewThread(modelId = defaultModel)
                     selectThread(newT.id)
                 } else {
                     val currentActive = _uiState.value.activeThread
@@ -83,7 +87,7 @@ class ChatViewModel(
                         it.copy(
                             threads = threads,
                             activeThread = activeThread,
-                            selectedModelId = activeThread.modelId,
+                            selectedModelId = activeThread.modelId.ifBlank { appPrefs.userPreferences.value.selectedModelId },
                             isHighThinking = activeThread.isHighThinking
                         )
                     }
@@ -94,9 +98,10 @@ class ChatViewModel(
     }
 
     private fun observeMessagesForThread(threadId: String) {
-        viewModelScope.launch {
+        messageObserverJob?.cancel()
+        messageObserverJob = viewModelScope.launch {
             chatRepository.getMessagesForThread(threadId).collect { msgs ->
-                // Don't overwrite active in-memory streaming message
+                // Only sync from DB when not actively streaming in memory
                 if (!_uiState.value.isGenerating) {
                     _uiState.update { it.copy(messages = msgs) }
                 }
@@ -111,7 +116,7 @@ class ChatViewModel(
                 _uiState.update {
                     it.copy(
                         activeThread = thread,
-                        selectedModelId = thread.modelId,
+                        selectedModelId = thread.modelId.ifBlank { appPrefs.userPreferences.value.selectedModelId },
                         isHighThinking = thread.isHighThinking
                     )
                 }
@@ -124,7 +129,7 @@ class ChatViewModel(
     fun createNewThread() {
         viewModelScope.launch {
             val provider = providerRepository.getActiveProvider()
-            val currentModel = appPrefs.userPreferences.value.selectedModelId
+            val currentModel = appPrefs.userPreferences.value.selectedModelId.ifBlank { provider.selectedModel }
             val newThread = chatRepository.createNewThread(
                 modelId = currentModel,
                 providerType = provider.type
@@ -137,19 +142,17 @@ class ChatViewModel(
         if (promptText.isBlank() && attachments.isEmpty()) return
 
         viewModelScope.launch {
-            // Ensure thread exists
             var activeThread = _uiState.value.activeThread
             if (activeThread == null) {
-                activeThread = chatRepository.createNewThread(
-                    modelId = appPrefs.userPreferences.value.selectedModelId
-                )
+                val currentModel = appPrefs.userPreferences.value.selectedModelId.ifBlank { "gemini-2.5-flash" }
+                activeThread = chatRepository.createNewThread(modelId = currentModel)
                 _uiState.update { it.copy(activeThread = activeThread) }
             }
 
             val userMsg = ChatMessage(
                 threadId = activeThread.id,
                 sender = MessageSender.USER,
-                content = promptText,
+                content = promptText.trim(),
                 attachments = attachments,
                 status = MessageStatus.SUCCESS
             )
@@ -178,8 +181,9 @@ class ChatViewModel(
                 status = MessageStatus.STREAMING
             )
 
-            // Append assistant message in UI state immediately
-            val currentList = _uiState.value.messages.toMutableList()
+            // Save initial assistant placeholder in DB and memory
+            chatRepository.saveMessage(assistantMsg)
+            val currentList = _uiState.value.messages.filter { it.id != assistantMsgId }.toMutableList()
             currentList.add(assistantMsg)
             _uiState.update { it.copy(messages = currentList) }
 
@@ -188,7 +192,11 @@ class ChatViewModel(
             var lastSaveTime = System.currentTimeMillis()
 
             try {
-                val effectiveModel = if (thread.modelId.isNotBlank()) thread.modelId else appPrefs.userPreferences.value.selectedModelId
+                val effectiveModel = if (thread.modelId.isNotBlank()) {
+                    thread.modelId
+                } else {
+                    appPrefs.userPreferences.value.selectedModelId.ifBlank { "gemini-2.5-flash" }
+                }
 
                 llmManager.streamResponse(
                     messages = historyForModel,
@@ -202,15 +210,15 @@ class ChatViewModel(
                         status = MessageStatus.STREAMING
                     )
 
-                    // Update UI State in memory
+                    // Update memory state
                     val updatedList = _uiState.value.messages.map { msg ->
                         if (msg.id == assistantMsgId) assistantMsg else msg
                     }
                     _uiState.update { it.copy(messages = updatedList) }
 
-                    // Periodically throttle DB save (every 250ms) to prevent Room flow re-creation
+                    // Throttle DB saves during stream
                     val now = System.currentTimeMillis()
-                    if (now - lastSaveTime > 250) {
+                    if (now - lastSaveTime > 300) {
                         lastSaveTime = now
                         chatRepository.saveMessage(assistantMsg)
                     }
@@ -220,7 +228,7 @@ class ChatViewModel(
                 if (finalOutput.isEmpty()) {
                     assistantMsg = assistantMsg.copy(
                         status = MessageStatus.ERROR,
-                        errorMessage = "Model returned empty response. Please check model ID or API key."
+                        errorMessage = "Model returned an empty response. Please verify your API key and model selection."
                     )
                     _uiState.update { it.copy(errorText = assistantMsg.errorMessage) }
                 } else {
@@ -230,7 +238,7 @@ class ChatViewModel(
                     )
                 }
 
-                // Final commit to Room DB
+                // Final commit to Room DB before setting isGenerating to false
                 chatRepository.saveMessage(assistantMsg)
 
                 val finalList = _uiState.value.messages.map { msg ->
@@ -268,6 +276,12 @@ class ChatViewModel(
     fun deleteThread(threadId: String) {
         viewModelScope.launch {
             chatRepository.deleteThread(threadId)
+        }
+    }
+
+    fun renameThread(threadId: String, newTitle: String) {
+        viewModelScope.launch {
+            chatRepository.renameThread(threadId, newTitle)
         }
     }
 

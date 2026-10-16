@@ -40,7 +40,7 @@ class ProviderRepository(
                     type = ProviderType.GEMINI,
                     apiKey = geminiKey,
                     baseUrl = ProviderType.GEMINI.defaultBaseUrl,
-                    selectedModel = "gemini-3.6-flash",
+                    selectedModel = "gemini-2.5-flash",
                     enabled = true,
                     fetchedModels = ModelFetcher.getFallbackModels(ProviderType.GEMINI)
                 ),
@@ -95,10 +95,11 @@ class ProviderRepository(
             type = ProviderType.GEMINI,
             apiKey = com.example.BuildConfig.GEMINI_API_KEY,
             baseUrl = ProviderType.GEMINI.defaultBaseUrl,
-            selectedModel = "gemini-3.6-flash",
+            selectedModel = "gemini-2.5-flash",
             enabled = true,
             fetchedModels = ModelFetcher.getFallbackModels(ProviderType.GEMINI)
         )
+
     }
 
     suspend fun saveProvider(provider: ProviderConfig) {

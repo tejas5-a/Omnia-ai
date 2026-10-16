@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -15,12 +16,14 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.AutomationTemplate
 import com.example.data.model.AutomationTemplates
+import com.example.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,16 +37,41 @@ fun TemplateGalleryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("TEMPLATE GALLERY", fontWeight = FontWeight.Bold, color = Color(0xFF00F2FE)) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            color = OmniaElevatedSurface,
+                            shape = CircleShape,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, OmniaNeonCyan.copy(alpha = 0.5f)),
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.AutoAwesome,
+                                    contentDescription = null,
+                                    tint = OmniaNeonCyan,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            "Automation Template Gallery",
+                            fontWeight = FontWeight.Bold,
+                            color = OmniaTextPrimary,
+                            fontSize = 18.sp
+                        )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0D0E15))
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = OmniaTextPrimary)
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = OmniaMainBg)
             )
         },
-        containerColor = Color(0xFF0D0E15)
+        containerColor = OmniaMainBg
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -53,18 +81,27 @@ fun TemplateGalleryScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Text(
-                    "One-Tap Cross-App Automations",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp
-                )
-                Text(
-                    "Select a pre-configured automation template to instantly install into your dashboard.",
-                    color = Color.Gray,
-                    fontSize = 12.sp
-                )
-                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = OmniaCardBg,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, OmniaSubtleBorder),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            "One-Tap Cross-App Automations",
+                            color = OmniaTextPrimary,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "Select a pre-configured automation template to instantly install into your dashboard and scheduler.",
+                            color = OmniaTextSecondary,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
             }
 
             items(templates, key = { it.id }) { template ->
@@ -91,8 +128,8 @@ private fun TemplateCard(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = Color(0xFF161824),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+        color = OmniaCardBg,
+        border = androidx.compose.foundation.BorderStroke(1.dp, OmniaSubtleBorder)
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -100,27 +137,46 @@ private fun TemplateCard(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = Color(0xFF00F2FE), modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(template.title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+                    Surface(
+                        color = OmniaElevatedSurface,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = OmniaBrightCyan,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        template.title,
+                        color = OmniaTextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp
+                    )
                 }
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFF212538)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(OmniaElevatedSurface)
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
                     Text(
                         template.category,
-                        color = Color(0xFF00F2FE),
+                        color = OmniaNeonCyan,
                         fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        fontWeight = FontWeight.Bold
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
-            Text(template.description, color = Color.Gray, fontSize = 12.sp)
+            Text(template.description, color = OmniaTextSecondary, fontSize = 12.sp)
 
             Spacer(modifier = Modifier.height(12.dp))
             Row(
@@ -130,27 +186,38 @@ private fun TemplateCard(
             ) {
                 Text(
                     "Target: ${template.workflow.targetApp.displayName}",
-                    color = Color.White.copy(alpha = 0.7f),
-                    fontSize = 11.sp
+                    color = OmniaTextMuted,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
 
                 Button(
                     onClick = onInstall,
                     enabled = !isInstalled,
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = if (isInstalled) Color(0xFF212538) else Color(0xFF00F2FE),
-                        disabledContainerColor = Color(0xFF212538)
+                        containerColor = OmniaElectricBlue,
+                        disabledContainerColor = OmniaElevatedSurface
                     ),
-                    shape = RoundedCornerShape(10.dp)
+                    shape = RoundedCornerShape(8.dp)
                 ) {
                     if (isInstalled) {
-                        Icon(Icons.Default.Check, contentDescription = null, tint = Color(0xFF4CAF50), modifier = Modifier.size(16.dp))
+                        Icon(
+                            Icons.Default.Check,
+                            contentDescription = null,
+                            tint = OmniaSuccessGreen,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Installed", color = Color(0xFF4CAF50), fontSize = 11.sp)
+                        Text("Installed", color = OmniaSuccessGreen, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     } else {
-                        Icon(Icons.Default.Add, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Install Template", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text("Install Template", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }

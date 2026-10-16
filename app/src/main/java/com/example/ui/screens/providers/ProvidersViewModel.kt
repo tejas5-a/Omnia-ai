@@ -6,13 +6,14 @@ import com.example.data.model.ConnectionStatus
 import com.example.data.model.ProviderConfig
 import com.example.data.repository.AppPreferencesRepository
 import com.example.data.repository.ProviderRepository
-import com.example.engine.LLMProviderManager
+import com.example.data.remote.ModelFetcher
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 data class ProvidersUiState(
     val providers: List<ProviderConfig> = emptyList(),
     val loadingProviderId: String? = null,
+    val testingProviderId: String? = null,
     val selectedProviderForEdit: ProviderConfig? = null,
     val editDialogOpen: Boolean = false,
     val manualModelDialogOpen: Boolean = false,
@@ -30,13 +31,10 @@ class ProvidersViewModel(
     private val _uiState = MutableStateFlow(ProvidersUiState())
     val uiState: StateFlow<ProvidersUiState> = _uiState.asStateFlow()
 
-    private val llmManager = LLMProviderManager { providerRepository.getActiveProvider() }
-
     init {
         viewModelScope.launch {
             providerRepository.initializeDefaultProviders()
 
-            // Combine provider data with user preferences
             combine(providerRepository.allProviders, appPrefs.userPreferences) { providersList, prefs ->
                 Pair(providersList, prefs)
             }.collect { (providersList, prefs) ->
@@ -81,12 +79,54 @@ class ProvidersViewModel(
         }
     }
 
+    fun testConnectionForProvider(provider: ProviderConfig) {
+        _uiState.update {
+            it.copy(
+                testingProviderId = provider.id,
+                statusMessage = "Testing API connection to ${provider.name}...",
+                errorMessage = null
+            )
+        }
+
+        viewModelScope.launch {
+            try {
+                val models = ModelFetcher.fetchModelsForProvider(provider)
+                val updated = provider.copy(
+                    connectionStatus = ConnectionStatus.CONNECTED,
+                    lastTestedMs = System.currentTimeMillis()
+                )
+                providerRepository.saveProvider(updated)
+                _uiState.update {
+                    it.copy(
+                        testingProviderId = null,
+                        statusMessage = "Connection verified! ${provider.name} responded with ${models.size} models.",
+                        errorMessage = null
+                    )
+                }
+            } catch (e: Exception) {
+                val updated = provider.copy(
+                    connectionStatus = ConnectionStatus.ERROR,
+                    lastTestedMs = System.currentTimeMillis()
+                )
+                providerRepository.saveProvider(updated)
+                _uiState.update {
+                    it.copy(
+                        testingProviderId = null,
+                        statusMessage = null,
+                        errorMessage = "Connection Test Failed: ${e.localizedMessage}"
+                    )
+                }
+            }
+        }
+    }
+
     fun selectModelForProvider(provider: ProviderConfig, modelId: String) {
         viewModelScope.launch {
-            val updated = provider.copy(selectedModel = modelId)
-            providerRepository.saveProvider(updated)
-            appPrefs.updateSelectedModelId(modelId)
-            _uiState.update { it.copy(statusMessage = "Active model set to: $modelId") }
+            val trimmed = modelId.trim()
+            if (trimmed.isEmpty()) return@launch
+            providerRepository.addManualModel(provider, trimmed)
+            appPrefs.updateSelectedModelId(trimmed)
+            _uiState.update { it.copy(statusMessage = "Active model set to: $trimmed") }
         }
     }
 
@@ -100,6 +140,8 @@ class ProvidersViewModel(
                 _uiState.value.providers.forEach { p ->
                     providerRepository.saveProvider(p.copy(enabled = p.id == provider.id))
                 }
+                appPrefs.updateActiveProviderId(provider.id)
+                appPrefs.updateSelectedModelId(provider.selectedModel)
             } else {
                 providerRepository.saveProvider(provider.copy(enabled = false))
             }

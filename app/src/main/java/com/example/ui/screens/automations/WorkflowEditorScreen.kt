@@ -2,11 +2,13 @@ package com.example.ui.screens.automations
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -20,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.*
+import com.example.ui.theme.*
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,18 +55,44 @@ fun WorkflowEditorScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("WORKFLOW EDITOR", fontWeight = FontWeight.Bold, color = Color(0xFF00F2FE)) },
+                title = {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            color = OmniaElevatedSurface,
+                            shape = CircleShape,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, OmniaNeonCyan.copy(alpha = 0.5f)),
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    Icons.Default.Build,
+                                    contentDescription = null,
+                                    tint = OmniaNeonCyan,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            "Workflow Builder",
+                            fontWeight = FontWeight.Bold,
+                            color = OmniaTextPrimary,
+                            fontSize = 18.sp
+                        )
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = OmniaTextPrimary)
                     }
                 },
                 actions = {
                     TextButton(onClick = { showSimulatorDialog = true }) {
-                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color(0xFF00F2FE), modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = OmniaBrightCyan, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Simulate", color = Color(0xFF00F2FE), fontWeight = FontWeight.Bold)
+                        Text("Simulate", color = OmniaBrightCyan, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
+                    Spacer(modifier = Modifier.width(4.dp))
                     Button(
                         onClick = {
                             val workflowToSave = AutomationWorkflow(
@@ -83,16 +112,16 @@ fun WorkflowEditorScreen(
                             viewModel.saveSelectedWorkflow(workflowToSave)
                             onNavigateBack()
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00F2FE)),
-                        shape = RoundedCornerShape(12.dp)
+                        colors = ButtonDefaults.buttonColors(containerColor = OmniaElectricBlue),
+                        shape = RoundedCornerShape(10.dp)
                     ) {
-                        Text("Save", color = Color.Black, fontWeight = FontWeight.Bold)
+                        Text("Save", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0D0E15))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = OmniaMainBg)
             )
         },
-        containerColor = Color(0xFF0D0E15)
+        containerColor = OmniaMainBg
     ) { padding ->
         LazyColumn(
             modifier = Modifier
@@ -104,27 +133,29 @@ fun WorkflowEditorScreen(
             item {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFF161824),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+                    color = OmniaCardBg,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, OmniaSubtleBorder)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("General Information", color = Color(0xFF00F2FE), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("General Information", color = OmniaNeonCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Spacer(modifier = Modifier.height(10.dp))
                         OutlinedTextField(
                             value = name,
                             onValueChange = { name = it },
-                            label = { Text("Workflow Name", color = Color.Gray) },
+                            label = { Text("Workflow Name", color = OmniaTextMuted, fontSize = 12.sp) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
+                            shape = RoundedCornerShape(10.dp),
                             colors = editorTextFieldColors()
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(10.dp))
                         OutlinedTextField(
                             value = description,
                             onValueChange = { description = it },
-                            label = { Text("Description", color = Color.Gray) },
+                            label = { Text("Description", color = OmniaTextMuted, fontSize = 12.sp) },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
+                            shape = RoundedCornerShape(10.dp),
                             colors = editorTextFieldColors()
                         )
                     }
@@ -134,23 +165,23 @@ fun WorkflowEditorScreen(
             item {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFF161824),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f))
+                    color = OmniaCardBg,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, OmniaSubtleBorder)
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Target Application Integration", color = Color(0xFF00F2FE), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("Target Application Integration", color = OmniaNeonCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(12.dp))
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             items(CrossAppTarget.values()) { app ->
                                 val isSelected = targetApp == app
                                 Surface(
                                     modifier = Modifier
-                                        .clip(RoundedCornerShape(12.dp))
+                                        .clip(RoundedCornerShape(10.dp))
                                         .clickable { targetApp = app },
-                                    color = if (isSelected) Color(0xFF00F2FE).copy(alpha = 0.2f) else Color(0xFF212538),
+                                    color = if (isSelected) OmniaElectricBlue.copy(alpha = 0.25f) else OmniaElevatedSurface,
                                     border = androidx.compose.foundation.BorderStroke(
                                         1.dp,
-                                        if (isSelected) Color(0xFF00F2FE) else Color.Transparent
+                                        if (isSelected) OmniaNeonCyan else OmniaSubtleBorder
                                     )
                                 ) {
                                     Column(
@@ -160,7 +191,7 @@ fun WorkflowEditorScreen(
                                         Text(
                                             app.displayName,
                                             fontSize = 12.sp,
-                                            color = if (isSelected) Color(0xFF00F2FE) else Color.White,
+                                            color = if (isSelected) OmniaBrightCyan else OmniaTextPrimary,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                                         )
                                     }
@@ -174,12 +205,12 @@ fun WorkflowEditorScreen(
             item {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFF161824),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00F2FE).copy(alpha = 0.4f))
+                    color = OmniaCardBg,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, OmniaNeonCyan.copy(alpha = 0.4f))
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("1. WHEN (Trigger Event)", color = Color(0xFF00F2FE), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("1. WHEN (Trigger Event)", color = OmniaNeonCyan, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                         }
                         Spacer(modifier = Modifier.height(12.dp))
                         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -190,10 +221,10 @@ fun WorkflowEditorScreen(
                                     onClick = { triggerType = type },
                                     label = { Text(type.displayName, fontSize = 11.sp) },
                                     colors = FilterChipDefaults.filterChipColors(
-                                        selectedContainerColor = Color(0xFF00F2FE),
-                                        selectedLabelColor = Color.Black,
-                                        containerColor = Color(0xFF212538),
-                                        labelColor = Color.White
+                                        selectedContainerColor = OmniaElectricBlue,
+                                        selectedLabelColor = Color.White,
+                                        containerColor = OmniaElevatedSurface,
+                                        labelColor = OmniaTextSecondary
                                     )
                                 )
                             }
@@ -204,8 +235,9 @@ fun WorkflowEditorScreen(
                             OutlinedTextField(
                                 value = triggerTime,
                                 onValueChange = { triggerTime = it },
-                                label = { Text("Scheduled Time (HH:mm)", color = Color.Gray) },
+                                label = { Text("Scheduled Time (HH:mm)", color = OmniaTextMuted, fontSize = 12.sp) },
                                 modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
                                 colors = editorTextFieldColors()
                             )
                         } else if (triggerType == TriggerType.WEBHOOK) {
@@ -213,8 +245,9 @@ fun WorkflowEditorScreen(
                             OutlinedTextField(
                                 value = webhookUrl,
                                 onValueChange = { webhookUrl = it },
-                                label = { Text("Webhook Endpoint URL", color = Color.Gray) },
+                                label = { Text("Webhook Endpoint URL", color = OmniaTextMuted, fontSize = 12.sp) },
                                 modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(10.dp),
                                 colors = editorTextFieldColors()
                             )
                         }
@@ -225,8 +258,8 @@ fun WorkflowEditorScreen(
             item {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFF161824),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFF9800).copy(alpha = 0.4f))
+                    color = OmniaCardBg,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, OmniaWarningAmber.copy(alpha = 0.4f))
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
@@ -234,7 +267,7 @@ fun WorkflowEditorScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("2. IF (Optional Conditions)", color = Color(0xFFFF9800), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("2. IF (Optional Conditions)", color = OmniaWarningAmber, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             TextButton(onClick = {
                                 conditions = conditions + AutomationCondition(
                                     id = UUID.randomUUID().toString(),
@@ -243,13 +276,14 @@ fun WorkflowEditorScreen(
                                     targetValue = "active"
                                 )
                             }) {
-                                Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFFFF9800), modifier = Modifier.size(16.dp))
-                                Text("Add Condition", color = Color(0xFFFF9800), fontSize = 12.sp)
+                                Icon(Icons.Default.Add, contentDescription = null, tint = OmniaWarningAmber, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Add Condition", color = OmniaWarningAmber, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
 
                         if (conditions.isEmpty()) {
-                            Text("No conditions set (Actions execute unconditionally).", fontSize = 12.sp, color = Color.Gray)
+                            Text("No conditions set (Actions execute unconditionally).", fontSize = 12.sp, color = OmniaTextSecondary)
                         } else {
                             for ((index, cond) in conditions.withIndex()) {
                                 Row(
@@ -264,8 +298,9 @@ fun WorkflowEditorScreen(
                                                 this[index] = cond.copy(field = newField)
                                             }
                                         },
-                                        label = { Text("Field", color = Color.Gray) },
+                                        label = { Text("Field", color = OmniaTextMuted, fontSize = 12.sp) },
                                         modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(8.dp),
                                         colors = editorTextFieldColors()
                                     )
                                     OutlinedTextField(
@@ -275,14 +310,15 @@ fun WorkflowEditorScreen(
                                                 this[index] = cond.copy(targetValue = newVal)
                                             }
                                         },
-                                        label = { Text("Equals", color = Color.Gray) },
+                                        label = { Text("Equals", color = OmniaTextMuted, fontSize = 12.sp) },
                                         modifier = Modifier.weight(1f),
+                                        shape = RoundedCornerShape(8.dp),
                                         colors = editorTextFieldColors()
                                     )
                                     IconButton(onClick = {
                                         conditions = conditions.toMutableList().apply { removeAt(index) }
                                     }) {
-                                        Icon(Icons.Default.Delete, contentDescription = "Remove", tint = Color(0xFFFF5252))
+                                        Icon(Icons.Default.Delete, contentDescription = "Remove", tint = OmniaErrorRed)
                                     }
                                 }
                             }
@@ -294,8 +330,8 @@ fun WorkflowEditorScreen(
             item {
                 Surface(
                     shape = RoundedCornerShape(16.dp),
-                    color = Color(0xFF161824),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF9D50BB).copy(alpha = 0.4f))
+                    color = OmniaCardBg,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, OmniaElectricBlue.copy(alpha = 0.5f))
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Row(
@@ -303,7 +339,7 @@ fun WorkflowEditorScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("3. THEN (Action Execution Steps)", color = Color(0xFF9D50BB), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text("3. THEN (Action Execution Steps)", color = OmniaBrightCyan, fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             TextButton(onClick = {
                                 actions = actions + AutomationAction(
                                     id = UUID.randomUUID().toString(),
@@ -312,8 +348,9 @@ fun WorkflowEditorScreen(
                                     parameters = mapOf("message" to "Step executed automatically")
                                 )
                             }) {
-                                Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF9D50BB), modifier = Modifier.size(16.dp))
-                                Text("Add Action Step", color = Color(0xFF9D50BB), fontSize = 12.sp)
+                                Icon(Icons.Default.Add, contentDescription = null, tint = OmniaBrightCyan, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Add Action Step", color = OmniaBrightCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                             }
                         }
 
@@ -323,7 +360,8 @@ fun WorkflowEditorScreen(
                                     .fillMaxWidth()
                                     .padding(vertical = 6.dp),
                                 shape = RoundedCornerShape(12.dp),
-                                color = Color(0xFF212538)
+                                color = OmniaElevatedSurface,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, OmniaSubtleBorder)
                             ) {
                                 Column(modifier = Modifier.padding(12.dp)) {
                                     Row(
@@ -331,12 +369,12 @@ fun WorkflowEditorScreen(
                                         horizontalArrangement = Arrangement.SpaceBetween,
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
-                                        Text("Step ${index + 1}: ${action.actionType}", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                        Text("Step ${index + 1}: ${action.actionType}", color = OmniaTextPrimary, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                         if (actions.size > 1) {
                                             IconButton(onClick = {
                                                 actions = actions.toMutableList().apply { removeAt(index) }
                                             }) {
-                                                Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color(0xFFFF5252), modifier = Modifier.size(16.dp))
+                                                Icon(Icons.Default.Close, contentDescription = "Remove", tint = OmniaErrorRed, modifier = Modifier.size(16.dp))
                                             }
                                         }
                                     }
@@ -352,8 +390,9 @@ fun WorkflowEditorScreen(
                                                     this[index] = action.copy(parameters = newParams)
                                                 }
                                             },
-                                            label = { Text(pKey, color = Color.Gray) },
+                                            label = { Text(pKey, color = OmniaTextMuted, fontSize = 11.sp) },
                                             modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(8.dp),
                                             colors = editorTextFieldColors()
                                         )
                                     }
@@ -369,14 +408,17 @@ fun WorkflowEditorScreen(
     if (showSimulatorDialog) {
         AlertDialog(
             onDismissRequest = { showSimulatorDialog = false },
-            title = { Text("Workflow Execution Simulator", color = Color(0xFF00F2FE), fontWeight = FontWeight.Bold) },
+            containerColor = OmniaCardBg,
+            titleContentColor = OmniaTextPrimary,
+            textContentColor = OmniaTextSecondary,
+            title = { Text("Workflow Execution Simulator", color = OmniaNeonCyan, fontWeight = FontWeight.Bold, fontSize = 16.sp) },
             text = {
                 Column {
-                    Text("Dry-running workflow steps across target ${targetApp.displayName}...", color = Color.White, fontSize = 12.sp)
+                    Text("Dry-running workflow steps across target ${targetApp.displayName}...", color = OmniaTextPrimary, fontSize = 12.sp)
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text("WHEN: ${triggerType.displayName}", color = Color.Gray, fontSize = 11.sp)
-                    Text("IF: ${if (conditions.isEmpty()) "Always True" else "${conditions.size} condition(s)"}", color = Color.Gray, fontSize = 11.sp)
-                    Text("THEN: ${actions.size} action(s) planned", color = Color.Gray, fontSize = 11.sp)
+                    Text("WHEN: ${triggerType.displayName}", color = OmniaTextSecondary, fontSize = 11.sp)
+                    Text("IF: ${if (conditions.isEmpty()) "Always True" else "${conditions.size} condition(s)"}", color = OmniaTextSecondary, fontSize = 11.sp)
+                    Text("THEN: ${actions.size} action(s) planned", color = OmniaTextSecondary, fontSize = 11.sp)
                 }
             },
             confirmButton = {
@@ -399,27 +441,28 @@ fun WorkflowEditorScreen(
                         viewModel.executeWorkflow(testWf)
                         showSimulatorDialog = false
                     },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00F2FE))
+                    shape = RoundedCornerShape(8.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = OmniaElectricBlue)
                 ) {
-                    Text("Run Live Test", color = Color.Black)
+                    Text("Run Live Test", color = Color.White, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showSimulatorDialog = false }) {
-                    Text("Cancel", color = Color.Gray)
+                    Text("Cancel", color = OmniaTextSecondary)
                 }
-            },
-            containerColor = Color(0xFF161824)
+            }
         )
     }
 }
 
 @Composable
 private fun editorTextFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedBorderColor = Color(0xFF00F2FE),
-    unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-    focusedContainerColor = Color(0xFF212538),
-    unfocusedContainerColor = Color(0xFF212538),
-    focusedTextColor = Color.White,
-    unfocusedTextColor = Color.White
+    focusedBorderColor = OmniaNeonCyan,
+    unfocusedBorderColor = OmniaSubtleBorder,
+    focusedContainerColor = OmniaElevatedSurface,
+    unfocusedContainerColor = OmniaElevatedSurface,
+    focusedTextColor = OmniaTextPrimary,
+    unfocusedTextColor = OmniaTextPrimary,
+    cursorColor = OmniaNeonCyan
 )

@@ -40,6 +40,7 @@ fun HomeScreen(
     onOpenThread: (String) -> Unit,
     onOpenService: (String) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenDrawer: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var isVisible by remember { mutableStateOf(false) }
@@ -50,19 +51,33 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                navigationIcon = {
+                    IconButton(
+                        onClick = onOpenDrawer,
+                        modifier = Modifier.testTag("home_menu_button")
+                    ) {
+                        Icon(Icons.Default.Menu, contentDescription = "Menu", tint = OmniaBrightCyan)
+                    }
+                },
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Surface(
-                            color = OmniaPrimaryPurple,
+                            color = OmniaElevatedSurface,
                             shape = CircleShape,
-                            modifier = Modifier.size(32.dp)
+                            border = androidx.compose.foundation.BorderStroke(1.dp, OmniaNeonCyan.copy(alpha = 0.5f)),
+                            modifier = Modifier.size(34.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text("Ω", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                Text("Ω", color = OmniaBrightCyan, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                             }
                         }
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text("OMNIA MAX", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                        Text(
+                            "OMNIA MAX",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            color = OmniaTextPrimary
+                        )
                     }
                 },
                 actions = {
@@ -79,53 +94,14 @@ fun HomeScreen(
                 )
             )
         },
-        bottomBar = {
-            Surface(
-                color = OmniaCardBg,
-                tonalElevation = 8.dp,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Button(
-                        onClick = onNewChat,
-                        shape = RoundedCornerShape(24.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = OmniaElevatedSurface),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(56.dp)
-                            .border(1.dp, OmniaElectricViolet.copy(alpha = 0.4f), RoundedCornerShape(24.dp))
-                            .testTag("home_new_chat_button")
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            AiOrbView(size = 32.dp, isPulsing = true)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                text = "Start New Conversation",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = OmniaTextPrimary
-                            )
-                        }
-                    }
-                }
-            }
-        },
+        containerColor = OmniaMainBg,
         modifier = modifier
     ) { innerPadding ->
         AnimatedVisibility(
             visible = isVisible,
             enter = fadeIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) +
                     slideInVertically(
-                        initialOffsetY = { 40 },
+                        initialOffsetY = { 30 },
                         animationSpec = spring(stiffness = Spring.StiffnessMediumLow)
                     ),
             exit = fadeOut()
@@ -136,31 +112,32 @@ fun HomeScreen(
                     .padding(innerPadding)
                     .background(OmniaMainBg)
                     .verticalScroll(rememberScrollState())
-                    .padding(16.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 // Header Greeting
                 Text(
-                    text = "Hey, there.",
-                    style = MaterialTheme.typography.headlineMedium,
+                    text = "Welcome to OMNIA MAX",
+                    style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = OmniaTextPrimary
                 )
                 Text(
-                    text = "How can I assist you today?",
-                    style = MaterialTheme.typography.titleMedium,
+                    text = "High-performance AI assistant & multi-app automation system.",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = OmniaTextSecondary
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
                 // Active Model Pill
                 Surface(
                     color = OmniaElevatedSurface,
                     shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier.padding(vertical = 4.dp)
+                    border = androidx.compose.foundation.BorderStroke(1.dp, OmniaSubtleBorder),
+                    modifier = Modifier.padding(vertical = 2.dp)
                 ) {
                     Row(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
@@ -171,28 +148,72 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Model: $activeModelId",
+                            text = "Active Engine: $activeModelId",
                             fontSize = 12.sp,
-                            color = OmniaElectricViolet,
+                            color = OmniaNeonCyan,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // Hero Action: Start New Conversation Card (No redundant bottomBar)
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = OmniaCardBg,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, OmniaCardBorderGradient),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onNewChat() }
+                        .testTag("home_new_chat_button")
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(18.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        AiOrbView(size = 44.dp, isPulsing = true)
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Start New Conversation",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = OmniaTextPrimary
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Chat, brainstorm, write code, or execute cross-app workflows",
+                                fontSize = 12.sp,
+                                color = OmniaTextSecondary
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.ArrowForward,
+                            contentDescription = null,
+                            tint = OmniaNeonCyan,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(22.dp))
 
                 // Quick Action Service Chips
                 Text(
-                    text = "Quick Services",
+                    text = "Quick Actions & Services",
                     style = MaterialTheme.typography.labelLarge,
-                    color = OmniaTextMuted,
+                    color = OmniaTextSecondary,
                     fontWeight = FontWeight.Bold
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(10.dp))
 
                 val serviceChips = listOf(
                     Pair("AI Chat", Icons.Default.Chat),
+                    Pair("MAX Automations", Icons.Default.Bolt),
                     Pair("Deep Research", Icons.Default.TravelExplore),
                     Pair("Code Assistant", Icons.Default.Code),
                     Pair("Document Analysis", Icons.Default.Description),
@@ -207,17 +228,26 @@ fun HomeScreen(
                         Surface(
                             color = OmniaCardBg,
                             shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier
-                                .border(1.dp, OmniaSubtleBorder, RoundedCornerShape(16.dp))
-                                .clickable { onOpenService(title) }
+                            border = androidx.compose.foundation.BorderStroke(1.dp, OmniaSubtleBorder),
+                            modifier = Modifier.clickable { onOpenService(title) }
                         ) {
                             Row(
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(imageVector = icon, contentDescription = null, tint = OmniaElectricViolet, modifier = Modifier.size(18.dp))
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = null,
+                                    tint = if (title == "MAX Automations") OmniaNeonCyan else OmniaElectricBlue,
+                                    modifier = Modifier.size(18.dp)
+                                )
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text(text = title, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = OmniaTextPrimary)
+                                Text(
+                                    text = title,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = OmniaTextPrimary
+                                )
                             }
                         }
                     }
@@ -225,7 +255,7 @@ fun HomeScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Recent Conversations
+                // Recent Conversations Section
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -242,24 +272,26 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(10.dp))
 
                 if (recentThreads.isEmpty()) {
-                    OutlinedCard(
+                    Surface(
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.outlinedCardColors(containerColor = OmniaCardBg),
+                        color = OmniaCardBg,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, OmniaSubtleBorder),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
                             modifier = Modifier.padding(20.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text("No recent conversations yet.", color = OmniaTextSecondary, fontSize = 13.sp)
+                            Text("No conversations yet. Tap above to start one!", color = OmniaTextSecondary, fontSize = 13.sp)
                         }
                     }
                 } else {
                     recentThreads.take(4).forEach { thread ->
-                        OutlinedCard(
+                        Surface(
                             onClick = { onOpenThread(thread.id) },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.outlinedCardColors(containerColor = OmniaCardBg),
+                            shape = RoundedCornerShape(14.dp),
+                            color = OmniaCardBg,
+                            border = androidx.compose.foundation.BorderStroke(1.dp, OmniaSubtleBorder),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp)
@@ -275,11 +307,26 @@ fun HomeScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Icon(Icons.Default.ChatBubbleOutline, contentDescription = null, tint = OmniaPrimaryPurple, modifier = Modifier.size(20.dp))
+                                    Icon(
+                                        Icons.Default.ChatBubbleOutline,
+                                        contentDescription = null,
+                                        tint = OmniaElectricBlue,
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Column {
-                                        Text(text = thread.title, fontWeight = FontWeight.Bold, color = OmniaTextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Text(text = "Model: ${thread.modelId}", fontSize = 11.sp, color = OmniaTextMuted)
+                                        Text(
+                                            text = thread.title,
+                                            fontWeight = FontWeight.Bold,
+                                            color = OmniaTextPrimary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                        Text(
+                                            text = "Model: ${thread.modelId}",
+                                            fontSize = 11.sp,
+                                            color = OmniaTextMuted
+                                        )
                                     }
                                 }
                                 Icon(Icons.Default.ChevronRight, contentDescription = null, tint = OmniaTextSecondary)
@@ -290,7 +337,7 @@ fun HomeScreen(
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // AI Tools Grid
+                // AI Workflows & Tools Grid
                 Text(
                     text = "AI Workflows & Tools",
                     style = MaterialTheme.typography.titleMedium,
@@ -301,9 +348,9 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 val tools = listOf(
+                    ToolGridItem("MAX Automations", "Automate WhatsApp, YouTube, Spotify, and system workflows.", Icons.Default.Bolt, "automations"),
                     ToolGridItem("Generate Content", "Create essays, social posts, or marketing copy.", Icons.Default.AutoAwesome, "agents"),
                     ToolGridItem("Document Creation", "Draft technical specifications & docs.", Icons.Default.Description, "knowledge"),
-                    ToolGridItem("Meeting Summaries", "Extract action items and key insights.", Icons.Default.Summarize, "knowledge"),
                     ToolGridItem("Coding Assistant", "Debug code, write tests, or refactor logic.", Icons.Default.Code, "workspace")
                 )
 
@@ -314,13 +361,14 @@ fun HomeScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             rowTools.forEach { tool ->
-                                OutlinedCard(
+                                Surface(
                                     onClick = { onOpenService(tool.targetScreen) },
                                     shape = RoundedCornerShape(16.dp),
-                                    colors = CardDefaults.outlinedCardColors(containerColor = OmniaCardBg),
+                                    color = OmniaCardBg,
+                                    border = androidx.compose.foundation.BorderStroke(1.dp, OmniaSubtleBorder),
                                     modifier = Modifier
                                         .weight(1f)
-                                        .height(130.dp)
+                                        .height(125.dp)
                                 ) {
                                     Column(
                                         modifier = Modifier
@@ -339,15 +387,36 @@ fun HomeScreen(
                                                 modifier = Modifier.size(32.dp)
                                             ) {
                                                 Box(contentAlignment = Alignment.Center) {
-                                                    Icon(imageVector = tool.icon, contentDescription = null, tint = OmniaAccentCyan, modifier = Modifier.size(18.dp))
+                                                    Icon(
+                                                        imageVector = tool.icon,
+                                                        contentDescription = null,
+                                                        tint = OmniaNeonCyan,
+                                                        modifier = Modifier.size(18.dp)
+                                                    )
                                                 }
                                             }
-                                            Icon(imageVector = Icons.Default.ArrowForward, contentDescription = null, tint = OmniaTextMuted, modifier = Modifier.size(14.dp))
+                                            Icon(
+                                                imageVector = Icons.Default.ArrowForward,
+                                                contentDescription = null,
+                                                tint = OmniaTextMuted,
+                                                modifier = Modifier.size(14.dp)
+                                            )
                                         }
 
                                         Column {
-                                            Text(text = tool.title, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = OmniaTextPrimary)
-                                            Text(text = tool.description, fontSize = 10.sp, color = OmniaTextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                            Text(
+                                                text = tool.title,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 13.sp,
+                                                color = OmniaTextPrimary
+                                            )
+                                            Text(
+                                                text = tool.description,
+                                                fontSize = 10.sp,
+                                                color = OmniaTextSecondary,
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
                                         }
                                     }
                                 }
@@ -355,6 +424,8 @@ fun HomeScreen(
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }

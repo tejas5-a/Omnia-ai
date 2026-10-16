@@ -13,13 +13,10 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.example.ui.theme.OmniaAccentCyan
-import com.example.ui.theme.OmniaElectricViolet
-import com.example.ui.theme.OmniaLavenderHighlight
-import com.example.ui.theme.OmniaPrimaryPurple
-import com.example.ui.theme.OmniaSuccessGreen
+import com.example.ui.theme.*
 
 enum class OrbState {
     IDLE,
@@ -46,16 +43,16 @@ fun AiOrbView(
 ) {
     val infiniteTransition = rememberInfiniteTransition(label = "orb_infinite_anim")
 
-    // Rotation angle for active state orbiting ring
+    // Rotation angle for active orbital ring
     val rotationAngle by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 360f,
         animationSpec = infiniteRepeatable(
             animation = tween(
                 durationMillis = when (orbState) {
-                    OrbState.THINKING -> 1200
-                    OrbState.STREAMING -> 800
-                    else -> 4000
+                    OrbState.THINKING -> 1800
+                    OrbState.STREAMING -> 1200
+                    else -> 5000
                 },
                 easing = LinearEasing
             ),
@@ -66,18 +63,18 @@ fun AiOrbView(
 
     // Breathing pulse scale animation
     val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 0.88f,
+        initialValue = 0.94f,
         targetValue = when (orbState) {
-            OrbState.STREAMING -> 1.15f
-            OrbState.THINKING -> 1.10f
-            else -> 1.04f
+            OrbState.STREAMING -> 1.08f
+            OrbState.THINKING -> 1.05f
+            else -> 1.02f
         },
         animationSpec = infiniteRepeatable(
             animation = tween(
                 durationMillis = when (orbState) {
-                    OrbState.STREAMING -> 600
-                    OrbState.THINKING -> 900
-                    else -> 2200
+                    OrbState.STREAMING -> 700
+                    OrbState.THINKING -> 1000
+                    else -> 2400
                 },
                 easing = FastOutSlowInEasing
             ),
@@ -88,23 +85,23 @@ fun AiOrbView(
 
     // Outward energy wave radius fraction
     val waveFraction by infiniteTransition.animateFloat(
-        initialValue = 0.8f,
-        targetValue = 1.4f,
+        initialValue = 0.85f,
+        targetValue = 1.35f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = LinearEasing),
+            animation = tween(1400, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "wave_fraction"
     )
 
-    // Dynamic primary aura colors transitioning seamlessly
+    // Dynamic aura colors using user's exact palette
     val coreStartColor by animateColorAsState(
         targetValue = when (orbState) {
-            OrbState.ERROR -> Color(0xFFFF5252)
+            OrbState.ERROR -> OmniaErrorRed
             OrbState.SUCCESS -> OmniaSuccessGreen
-            OrbState.STREAMING -> OmniaAccentCyan
-            OrbState.THINKING -> OmniaLavenderHighlight
-            OrbState.IDLE -> OmniaLavenderHighlight
+            OrbState.STREAMING -> OmniaBrightCyan
+            OrbState.THINKING -> OmniaNeonCyan
+            OrbState.IDLE -> OmniaElectricBlue
         },
         animationSpec = tween(400),
         label = "core_start"
@@ -112,18 +109,24 @@ fun AiOrbView(
 
     val coreEndColor by animateColorAsState(
         targetValue = when (orbState) {
-            OrbState.ERROR -> Color(0xFFD32F2F)
-            OrbState.SUCCESS -> Color(0xFF00C853)
-            OrbState.STREAMING -> OmniaPrimaryPurple
-            OrbState.THINKING -> OmniaElectricViolet
-            OrbState.IDLE -> OmniaElectricViolet
+            OrbState.ERROR -> Color(0xFFB91C1C)
+            OrbState.SUCCESS -> Color(0xFF059669)
+            OrbState.STREAMING -> OmniaElectricBlue
+            OrbState.THINKING -> OmniaRoyalBlue
+            OrbState.IDLE -> OmniaRoyalBlue
         },
         animationSpec = tween(400),
         label = "core_end"
     )
 
+    // Crucial: Fixed layout size prevents measurement cycles and flickering
     Box(
-        modifier = modifier.size(size * pulseScale),
+        modifier = modifier
+            .size(size)
+            .graphicsLayer {
+                scaleX = pulseScale
+                scaleY = pulseScale
+            },
         contentAlignment = Alignment.Center
     ) {
         Canvas(modifier = Modifier.size(size)) {
@@ -133,9 +136,9 @@ fun AiOrbView(
             // 1. Streaming Energy Waves (if streaming)
             if (orbState == OrbState.STREAMING) {
                 drawCircle(
-                    color = OmniaAccentCyan.copy(alpha = (1.4f - waveFraction).coerceIn(0f, 0.5f)),
+                    color = OmniaBrightCyan.copy(alpha = (1.35f - waveFraction).coerceIn(0f, 0.45f)),
                     radius = radius * waveFraction,
-                    style = Stroke(width = 2.dp.toPx())
+                    style = Stroke(width = 1.5.dp.toPx())
                 )
             }
 
@@ -143,14 +146,14 @@ fun AiOrbView(
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        coreStartColor.copy(alpha = 0.5f),
-                        coreEndColor.copy(alpha = 0.25f),
+                        coreStartColor.copy(alpha = 0.4f),
+                        coreEndColor.copy(alpha = 0.18f),
                         Color.Transparent
                     ),
                     center = center,
-                    radius = radius * 1.35f
+                    radius = radius * 1.3f
                 ),
-                radius = radius * 1.35f
+                radius = radius * 1.3f
             )
 
             // 3. Inner Core Orb
@@ -159,25 +162,25 @@ fun AiOrbView(
                     colors = listOf(
                         coreStartColor,
                         coreEndColor,
-                        OmniaPrimaryPurple
+                        OmniaElectricBlue
                     ),
                     center = center,
-                    radius = radius * 0.8f
+                    radius = radius * 0.78f
                 ),
-                radius = radius * 0.8f
+                radius = radius * 0.78f
             )
 
             // 4. Rotating Accent Orbital Ring
             rotate(rotationAngle, center) {
                 drawCircle(
                     color = when (orbState) {
-                        OrbState.ERROR -> Color(0xFFFF8A80)
-                        OrbState.SUCCESS -> Color(0xFFB9F6CA)
-                        OrbState.STREAMING -> OmniaAccentCyan
-                        else -> OmniaAccentCyan.copy(alpha = 0.85f)
+                        OrbState.ERROR -> Color(0xFFFCA5A5)
+                        OrbState.SUCCESS -> Color(0xFF6EE7B7)
+                        OrbState.STREAMING -> OmniaBrightCyan
+                        else -> OmniaNeonCyan.copy(alpha = 0.8f)
                     },
-                    radius = radius * 0.95f,
-                    style = Stroke(width = if (orbState == OrbState.STREAMING || orbState == OrbState.THINKING) 2.5.dp.toPx() else 1.5.dp.toPx())
+                    radius = radius * 0.92f,
+                    style = Stroke(width = if (orbState == OrbState.STREAMING || orbState == OrbState.THINKING) 2.dp.toPx() else 1.2.dp.toPx())
                 )
             }
         }

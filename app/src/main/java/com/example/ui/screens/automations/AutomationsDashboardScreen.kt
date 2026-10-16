@@ -2,6 +2,7 @@ package com.example.ui.screens.automations
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,11 +19,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.*
+import com.example.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -33,7 +36,8 @@ fun AutomationsDashboardScreen(
     viewModel: AutomationsViewModel,
     onNavigateToEditor: () -> Unit,
     onNavigateToTemplates: () -> Unit,
-    onNavigateToLogs: () -> Unit
+    onNavigateToLogs: () -> Unit,
+    onOpenDrawer: () -> Unit = {}
 ) {
     val automations by viewModel.automations.collectAsState()
     val runLogs by viewModel.runLogs.collectAsState()
@@ -68,18 +72,27 @@ fun AutomationsDashboardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
+                navigationIcon = {
+                    IconButton(
+                        onClick = onOpenDrawer,
+                        modifier = Modifier.testTag("automations_menu_button")
+                    ) {
+                        Icon(Icons.Default.Menu, contentDescription = "Menu", tint = OmniaBrightCyan)
+                    }
+                },
                 title = {
                     Column {
                         Text(
                             "MAX AUTOMATIONS",
                             fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.2.sp,
-                            color = Color(0xFF00F2FE)
+                            letterSpacing = 1.1.sp,
+                            color = OmniaNeonCyan,
+                            fontSize = 17.sp
                         )
                         Text(
                             "Cross-App Execution Platform",
                             fontSize = 11.sp,
-                            color = Color.White.copy(alpha = 0.6f)
+                            color = OmniaTextSecondary
                         )
                     }
                 },
@@ -88,20 +101,20 @@ fun AutomationsDashboardScreen(
                         BadgedBox(
                             badge = {
                                 if (runLogs.isNotEmpty()) {
-                                    Badge(containerColor = Color(0xFF00F2FE)) {
-                                        Text("${runLogs.size}")
+                                    Badge(containerColor = OmniaElectricBlue) {
+                                        Text("${runLogs.size}", color = Color.White)
                                     }
                                 }
                             }
                         ) {
-                            Icon(Icons.Outlined.History, contentDescription = "Run Logs", tint = Color.White)
+                            Icon(Icons.Outlined.History, contentDescription = "Run Logs", tint = OmniaTextPrimary)
                         }
                     }
                     IconButton(onClick = onNavigateToTemplates) {
-                        Icon(Icons.Outlined.AutoAwesome, contentDescription = "Templates", tint = Color(0xFF00F2FE))
+                        Icon(Icons.Outlined.AutoAwesome, contentDescription = "Templates", tint = OmniaBrightCyan)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFF0D0E15))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = OmniaMainBg)
             )
         },
         floatingActionButton = {
@@ -110,14 +123,14 @@ fun AutomationsDashboardScreen(
                     viewModel.createNewWorkflow()
                     onNavigateToEditor()
                 },
-                containerColor = Color(0xFF00F2FE),
-                contentColor = Color.Black,
+                containerColor = OmniaElectricBlue,
+                contentColor = Color.White,
                 shape = RoundedCornerShape(16.dp),
-                icon = { Icon(Icons.Default.Add, contentDescription = "Create Workflow") },
-                text = { Text("New Workflow", fontWeight = FontWeight.Bold) }
+                icon = { Icon(Icons.Default.Add, contentDescription = "Create Workflow", tint = Color.White) },
+                text = { Text("New Workflow", fontWeight = FontWeight.Bold, color = Color.White) }
             )
         },
-        containerColor = Color(0xFF0D0E15)
+        containerColor = OmniaMainBg
     ) { padding ->
         Column(
             modifier = Modifier
@@ -132,29 +145,30 @@ fun AutomationsDashboardScreen(
                 totalRuns = totalRuns
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Search workflows or target apps...", color = Color.Gray) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = Color(0xFF00F2FE)) },
+                placeholder = { Text("Search workflows or target apps...", color = OmniaTextMuted, fontSize = 13.sp) },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = OmniaNeonCyan) },
                 trailingIcon = {
                     if (searchQuery.isNotEmpty()) {
                         IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Close, contentDescription = "Clear", tint = Color.Gray)
+                            Icon(Icons.Default.Close, contentDescription = "Clear", tint = OmniaTextMuted)
                         }
                     }
                 },
                 singleLine = true,
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Color(0xFF00F2FE),
-                    unfocusedBorderColor = Color.White.copy(alpha = 0.2f),
-                    focusedContainerColor = Color(0xFF161824),
-                    unfocusedContainerColor = Color(0xFF161824),
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White
+                    focusedBorderColor = OmniaElectricBlue,
+                    unfocusedBorderColor = OmniaSubtleBorder,
+                    focusedContainerColor = OmniaCardBg,
+                    unfocusedContainerColor = OmniaCardBg,
+                    focusedTextColor = OmniaTextPrimary,
+                    unfocusedTextColor = OmniaTextPrimary,
+                    cursorColor = OmniaNeonCyan
                 ),
                 shape = RoundedCornerShape(12.dp)
             )
@@ -166,7 +180,7 @@ fun AutomationsDashboardScreen(
                 onSelectFilter = { selectedFilter = it }
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             AnimatedVisibility(visible = lastSummary != null) {
                 lastSummary?.let { summary ->
@@ -175,23 +189,23 @@ fun AutomationsDashboardScreen(
                             .fillMaxWidth()
                             .padding(bottom = 12.dp),
                         shape = RoundedCornerShape(12.dp),
-                        color = Color(0xFF00F2FE).copy(alpha = 0.15f),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00F2FE))
+                        color = OmniaElevatedSurface,
+                        border = androidx.compose.foundation.BorderStroke(1.dp, OmniaNeonCyan.copy(alpha = 0.5f))
                     ) {
                         Row(
                             modifier = Modifier.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF00F2FE))
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = OmniaNeonCyan)
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 summary,
-                                color = Color.White,
+                                color = OmniaTextPrimary,
                                 fontSize = 12.sp,
                                 modifier = Modifier.weight(1f)
                             )
                             IconButton(onClick = { viewModel.clearSummary() }) {
-                                Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = Color.Gray)
+                                Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = OmniaTextMuted)
                             }
                         }
                     }
@@ -241,11 +255,8 @@ private fun MetricsSummaryBar(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
-        color = Color(0xFF161824),
-        border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            Brush.horizontalGradient(listOf(Color(0xFF00F2FE), Color(0xFF9D50BB)))
-        )
+        color = OmniaCardBg,
+        border = androidx.compose.foundation.BorderStroke(1.dp, OmniaSubtleBorder)
     ) {
         Row(
             modifier = Modifier
@@ -254,13 +265,13 @@ private fun MetricsSummaryBar(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            MetricItem(label = "Total", value = "$totalCount", color = Color(0xFF00F2FE))
-            Divider(modifier = Modifier.height(24.dp).width(1.dp), color = Color.White.copy(alpha = 0.1f))
-            MetricItem(label = "Active", value = "$activeCount", color = Color(0xFF4CAF50))
-            Divider(modifier = Modifier.height(24.dp).width(1.dp), color = Color.White.copy(alpha = 0.1f))
-            MetricItem(label = "Total Runs", value = "$totalRuns", color = Color(0xFFFF9800))
-            Divider(modifier = Modifier.height(24.dp).width(1.dp), color = Color.White.copy(alpha = 0.1f))
-            MetricItem(label = "Success", value = "$successRate%", color = Color(0xFFE91E63))
+            MetricItem(label = "Total", value = "$totalCount", color = OmniaBrightCyan)
+            Divider(modifier = Modifier.height(24.dp).width(1.dp), color = OmniaSubtleBorder)
+            MetricItem(label = "Active", value = "$activeCount", color = OmniaSuccessGreen)
+            Divider(modifier = Modifier.height(24.dp).width(1.dp), color = OmniaSubtleBorder)
+            MetricItem(label = "Runs", value = "$totalRuns", color = OmniaElectricBlue)
+            Divider(modifier = Modifier.height(24.dp).width(1.dp), color = OmniaSubtleBorder)
+            MetricItem(label = "Success", value = "$successRate%", color = OmniaNeonCyan)
         }
     }
 }
@@ -268,8 +279,8 @@ private fun MetricsSummaryBar(
 @Composable
 private fun MetricItem(label: String, value: String, color: Color) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = color)
-        Text(label, fontSize = 10.sp, color = Color.Gray)
+        Text(value, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = color)
+        Text(label, fontSize = 10.sp, color = OmniaTextMuted)
     }
 }
 
@@ -286,9 +297,7 @@ private fun FilterChipsRow(
         "WEBHOOK" to "Webhooks"
     )
 
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         items(filters) { (key, label) ->
             val isSelected = selectedFilter == key
             FilterChip(
@@ -296,16 +305,16 @@ private fun FilterChipsRow(
                 onClick = { onSelectFilter(key) },
                 label = { Text(label, fontSize = 12.sp) },
                 colors = FilterChipDefaults.filterChipColors(
-                    selectedContainerColor = Color(0xFF00F2FE),
-                    selectedLabelColor = Color.Black,
-                    containerColor = Color(0xFF161824),
-                    labelColor = Color.White
+                    selectedContainerColor = OmniaElectricBlue,
+                    selectedLabelColor = Color.White,
+                    containerColor = OmniaCardBg,
+                    labelColor = OmniaTextSecondary
                 ),
                 border = FilterChipDefaults.filterChipBorder(
                     enabled = true,
                     selected = isSelected,
-                    borderColor = Color.White.copy(alpha = 0.2f),
-                    selectedBorderColor = Color(0xFF00F2FE)
+                    borderColor = OmniaSubtleBorder,
+                    selectedBorderColor = OmniaElectricBlue
                 ),
                 shape = RoundedCornerShape(20.dp)
             )
@@ -329,10 +338,10 @@ private fun WorkflowCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .clickable { onEdit() },
-        color = Color(0xFF161824),
+        color = OmniaCardBg,
         border = androidx.compose.foundation.BorderStroke(
             1.dp,
-            if (workflow.isEnabled) Color(0xFF00F2FE).copy(alpha = 0.4f) else Color.White.copy(alpha = 0.1f)
+            if (workflow.isEnabled) OmniaElectricBlue.copy(alpha = 0.5f) else OmniaSubtleBorder
         )
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -347,16 +356,17 @@ private fun WorkflowCard(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(38.dp)
                             .clip(RoundedCornerShape(10.dp))
-                            .background(Color(0xFF212538)),
+                            .background(OmniaElevatedSurface)
+                            .border(1.dp, OmniaSubtleBorder, RoundedCornerShape(10.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             workflow.targetApp.displayName.take(2).uppercase(),
-                            color = Color(0xFF00F2FE),
+                            color = OmniaBrightCyan,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                            fontSize = 13.sp
                         )
                     }
 
@@ -365,15 +375,15 @@ private fun WorkflowCard(
                     Column {
                         Text(
                             workflow.name,
-                            color = Color.White,
+                            color = OmniaTextPrimary,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
+                            fontSize = 14.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
                             workflow.description,
-                            color = Color.Gray,
+                            color = OmniaTextSecondary,
                             fontSize = 12.sp,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -385,10 +395,10 @@ private fun WorkflowCard(
                     checked = workflow.isEnabled,
                     onCheckedChange = { onToggle() },
                     colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.Black,
-                        checkedTrackColor = Color(0xFF00F2FE),
-                        uncheckedThumbColor = Color.Gray,
-                        uncheckedTrackColor = Color(0xFF212538)
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = OmniaElectricBlue,
+                        uncheckedThumbColor = OmniaTextMuted,
+                        uncheckedTrackColor = OmniaElevatedSurface
                     )
                 )
             }
@@ -402,73 +412,72 @@ private fun WorkflowCard(
             ) {
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFF00F2FE).copy(alpha = 0.15f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00F2FE).copy(alpha = 0.3f))
+                    color = OmniaElevatedSurface,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, OmniaNeonCyan.copy(alpha = 0.35f))
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("WHEN:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF00F2FE))
+                        Text("WHEN:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = OmniaNeonCyan)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text(workflow.triggerType.displayName, fontSize = 10.sp, color = Color.White)
+                        Text(workflow.triggerType.displayName, fontSize = 10.sp, color = OmniaTextPrimary)
                     }
                 }
 
                 Surface(
                     shape = RoundedCornerShape(8.dp),
-                    color = Color(0xFF9D50BB).copy(alpha = 0.15f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF9D50BB).copy(alpha = 0.3f))
+                    color = OmniaElevatedSurface,
+                    border = androidx.compose.foundation.BorderStroke(1.dp, OmniaSubtleBorder)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("THEN:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF9D50BB))
+                        Text("THEN:", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = OmniaRoyalBlue)
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("${workflow.actions.size} step(s)", fontSize = 10.sp, color = Color.White)
+                        Text("${workflow.actions.size} step(s)", fontSize = 10.sp, color = OmniaTextSecondary)
                     }
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
 
-                OutlinedButton(
+                Button(
                     onClick = onRun,
                     enabled = !isExecuting,
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF00F2FE)),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00F2FE)),
+                    colors = ButtonDefaults.buttonColors(containerColor = OmniaElectricBlue),
                     shape = RoundedCornerShape(8.dp),
                     contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp)
                 ) {
-                    Icon(Icons.Default.PlayArrow, contentDescription = "Run", modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.PlayArrow, contentDescription = "Run", modifier = Modifier.size(15.dp), tint = Color.White)
                     Spacer(modifier = Modifier.width(4.dp))
-                    Text("RUN NOW", fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    Text("RUN", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
 
                 Box {
-                    IconButton(onClick = { showMenu = true }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "Options", tint = Color.Gray)
+                    IconButton(onClick = { showMenu = true }, modifier = Modifier.size(28.dp)) {
+                        Icon(Icons.Default.MoreVert, contentDescription = "Options", tint = OmniaTextMuted)
                     }
                     DropdownMenu(
                         expanded = showMenu,
                         onDismissRequest = { showMenu = false },
-                        modifier = Modifier.background(Color(0xFF212538))
+                        modifier = Modifier.background(OmniaElevatedSurface)
                     ) {
                         DropdownMenuItem(
-                            text = { Text("Edit Workflow", color = Color.White) },
+                            text = { Text("Edit Workflow", color = OmniaTextPrimary) },
                             onClick = {
                                 showMenu = false
                                 onEdit()
                             },
-                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = Color(0xFF00F2FE)) }
+                            leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null, tint = OmniaNeonCyan) }
                         )
                         DropdownMenuItem(
-                            text = { Text("Delete", color = Color(0xFFFF5252)) },
+                            text = { Text("Delete", color = OmniaErrorRed) },
                             onClick = {
                                 showMenu = false
                                 onDelete()
                             },
-                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = Color(0xFFFF5252)) }
+                            leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = OmniaErrorRed) }
                         )
                     }
                 }
@@ -478,9 +487,9 @@ private fun WorkflowCard(
                 Spacer(modifier = Modifier.height(8.dp))
                 val dateStr = SimpleDateFormat("MMM dd, HH:mm", Locale.getDefault()).format(Date(workflow.lastRunMs))
                 Text(
-                    "Last run: $dateStr • Runs: ${workflow.runCount} (Success: ${workflow.successCount})",
+                    "Last run: $dateStr • Total runs: ${workflow.runCount} (Success: ${workflow.successCount})",
                     fontSize = 10.sp,
-                    color = Color.Gray
+                    color = OmniaTextMuted
                 )
             }
         }
@@ -496,44 +505,44 @@ private fun EmptyStateView(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 48.dp),
+            .padding(vertical = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
             Icons.Outlined.AutoAwesome,
             contentDescription = null,
-            modifier = Modifier.size(64.dp),
-            tint = Color(0xFF00F2FE).copy(alpha = 0.6f)
+            modifier = Modifier.size(56.dp),
+            tint = OmniaBrightCyan.copy(alpha = 0.7f)
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
         Text(
-            if (searchQuery.isEmpty()) "No Automations Found" else "No matching automations",
-            color = Color.White,
+            if (searchQuery.isEmpty()) "No Automations Configured" else "No matching automations",
+            color = OmniaTextPrimary,
             fontWeight = FontWeight.Bold,
-            fontSize = 18.sp
+            fontSize = 16.sp
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(6.dp))
         Text(
-            "Create custom WHEN-IF-THEN cross-app workflows or install from the Template Gallery.",
-            color = Color.Gray,
+            "Create custom WHEN-IF-THEN cross-app workflows or install pre-configured templates.",
+            color = OmniaTextSecondary,
             fontSize = 12.sp,
             modifier = Modifier.padding(horizontal = 32.dp),
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(
+            OutlinedButton(
                 onClick = onOpenTemplates,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF161824)),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF00F2FE))
+                colors = ButtonDefaults.outlinedButtonColors(containerColor = OmniaCardBg),
+                border = androidx.compose.foundation.BorderStroke(1.dp, OmniaNeonCyan)
             ) {
-                Text("Explore Templates", color = Color(0xFF00F2FE))
+                Text("Explore Templates", color = OmniaNeonCyan)
             }
             Button(
                 onClick = onCreateNew,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF00F2FE))
+                colors = ButtonDefaults.buttonColors(containerColor = OmniaElectricBlue)
             ) {
-                Text("Build Workflow", color = Color.Black)
+                Text("Build Workflow", color = Color.White, fontWeight = FontWeight.Bold)
             }
         }
     }

@@ -3,34 +3,27 @@ package com.example.ui.screens.chat
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.graphics.BitmapFactory
 import android.net.Uri
-import android.util.Base64
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.*
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.delay
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -38,8 +31,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Attachment
@@ -48,9 +44,10 @@ import com.example.data.model.MessageSender
 import com.example.data.model.MessageStatus
 import com.example.ui.components.AiOrbView
 import com.example.ui.components.MarkdownText
-import com.example.ui.components.ModelSelectorHeader
+import com.example.ui.components.ModelSelectorSheet
 import com.example.ui.theme.*
-import java.io.ByteArrayOutputStream
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,91 +58,120 @@ fun ChatScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     var inputText by remember { mutableStateOf("") }
+    var isModelSheetOpen by remember { mutableStateOf(false) }
     val attachedImages = remember { mutableStateListOf<Attachment>() }
-    var systemInstructionText by remember { mutableStateOf("") }
 
-    LaunchedEffect(uiState.activeThread) {
-        systemInstructionText = uiState.activeThread?.systemInstruction ?: ""
+    val photoPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri: Uri? ->
+        uri?.let {
+            try {
+                val inputStream = context.contentResolver.openInputStream(it)
+                val bytes = inputStream?.readBytes()
+                inputStream?.close()
+
+                if (bytes != null) {
+                    val base64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+                    val mimeType = context.contentResolver.getType(it) ?: "image/jpeg"
+                    attachedImages.add(
+                        Attachment(
+                            id = java.util.UUID.randomUUID().toString(),
+                            type = "IMAGE",
+                            fileName = "Image Attachment",
+                            mimeType = mimeType,
+                            base64Data = base64
+                        )
+                    )
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Failed to load image", Toast.LENGTH_SHORT).show()
+            }
+        }
     }
 
-    val isUserAtBottom by remember {
+    // Bug D fix: Smart auto-scroll handling
+    val isNearBottom by remember {
         derivedStateOf {
-            val layoutInfo = listState.layoutInfo
-            val totalItems = layoutInfo.totalItemsCount
-            if (totalItems <= 1) true
+            val totalItems = listState.layoutInfo.totalItemsCount
+            if (totalItems == 0) true
             else {
-                val lastVisibleIndex = layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+                val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
                 lastVisibleIndex >= totalItems - 2
             }
         }
     }
 
-    LaunchedEffect(uiState.messages.size, uiState.activeThread?.id) {
-        if (uiState.messages.isNotEmpty() && isUserAtBottom) {
-            listState.scrollToItem(uiState.messages.size - 1)
-        }
-    }
-
-    val lastMessageContent = uiState.messages.lastOrNull()?.content ?: ""
-    LaunchedEffect(lastMessageContent) {
-        if (isUserAtBottom && uiState.messages.isNotEmpty() && uiState.isGenerating) {
-            listState.scrollToItem(uiState.messages.size - 1)
-        }
-    }
-
-    val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickVisualMedia()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            try {
-                val inputStream = context.contentResolver.openInputStream(uri)
-                val bitmap = BitmapFactory.decodeStream(inputStream)
-                val outputStream = ByteArrayOutputStream()
-                bitmap?.compress(android.graphics.Bitmap.CompressFormat.JPEG, 80, outputStream)
-                val base64 = Base64.encodeToString(outputStream.toByteArray(), Base64.NO_WRAP)
-
-                attachedImages.add(
-                    Attachment(
-                        type = "IMAGE",
-                        uri = uri.toString(),
-                        fileName = "photo.jpg",
-                        mimeType = "image/jpeg",
-                        base64Data = base64
-                    )
-                )
-            } catch (e: Exception) {
-                Toast.makeText(context, "Failed to attach photo", Toast.LENGTH_SHORT).show()
-            }
+    // Auto-scroll on new messages if user is near bottom
+    LaunchedEffect(uiState.messages.size, uiState.messages.lastOrNull()?.content?.length) {
+        if (uiState.messages.isNotEmpty() && (isNearBottom || uiState.isGenerating)) {
+            listState.animateScrollToItem(uiState.messages.size - 1)
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Column {
-                        Text(
-                            text = uiState.activeThread?.title ?: "OMNIA MAX",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = OmniaTextPrimary
-                        )
-                        Text(
-                            text = "Model: ${uiState.selectedModelId}",
-                            fontSize = 11.sp,
-                            color = OmniaElectricViolet
-                        )
-                    }
-                },
                 navigationIcon = {
                     IconButton(
                         onClick = onOpenDrawer,
                         modifier = Modifier.testTag("open_drawer_button")
                     ) {
-                        Icon(Icons.Default.Menu, contentDescription = "Open Drawer", tint = OmniaTextSecondary)
+                        Icon(
+                            imageVector = Icons.Default.Menu,
+                            contentDescription = "Open Drawer",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                },
+                title = {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "OMNIA MAX",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        // Model Selector Pill Button
+                        Surface(
+                            onClick = { isModelSheetOpen = true },
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(16.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                            modifier = Modifier.testTag("model_selector_pill")
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = uiState.selectedModelId,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.widthIn(max = 140.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = "Select Model",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
                     }
                 },
                 actions = {
@@ -153,48 +179,43 @@ fun ChatScreen(
                         onClick = { viewModel.createNewThread() },
                         modifier = Modifier.testTag("appbar_new_chat_button")
                     ) {
-                        Icon(Icons.Default.AddComment, contentDescription = "New Chat", tint = OmniaElectricViolet)
+                        Icon(
+                            imageVector = Icons.Default.AddComment,
+                            contentDescription = "New Chat",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = OmniaMainBg)
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
             )
         },
+        containerColor = MaterialTheme.colorScheme.background,
         modifier = modifier
     ) { innerPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .background(OmniaMainBg)
+                .background(MaterialTheme.colorScheme.background)
         ) {
-            // Model Selector Bar
-            uiState.activeProvider?.let { provider ->
-                ModelSelectorHeader(
-                    activeProvider = provider,
-                    selectedModelId = uiState.selectedModelId,
-                    availableModels = uiState.availableModels,
-                    isHighThinking = uiState.isHighThinking,
-                    onModelSelected = { viewModel.setSelectedModel(it) },
-                    onThinkingToggled = { viewModel.toggleThinkingMode(it) },
-                    onSystemPromptClicked = { viewModel.setSystemPromptSheetOpen(true) }
-                )
-            }
-
-            // Message Feed
+            // Main Messages Area or Welcome State
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
             ) {
                 if (uiState.messages.isEmpty()) {
-                    EmptyChatWelcomeView(
-                        activeModelId = uiState.selectedModelId,
-                        onPromptSuggested = { prompt -> inputText = prompt }
+                    WelcomeStateView(
+                        onPromptSelected = { prompt ->
+                            inputText = prompt
+                        }
                     )
                 } else {
                     LazyColumn(
                         state = listState,
-                        contentPadding = PaddingValues(16.dp),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
@@ -212,6 +233,36 @@ fun ChatScreen(
                         }
                     }
                 }
+
+                // Scroll to Bottom Floating Button
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = !isNearBottom && uiState.messages.isNotEmpty(),
+                    enter = fadeIn() + scaleIn(),
+                    exit = fadeOut() + scaleOut(),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp)
+                ) {
+                    FloatingActionButton(
+                        onClick = {
+                            scope.launch {
+                                listState.animateScrollToItem(uiState.messages.size - 1)
+                            }
+                        },
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurface,
+                        shape = CircleShape,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .border(1.dp, MaterialTheme.colorScheme.outline, CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowDownward,
+                            contentDescription = "Scroll to bottom",
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
             }
 
             // Attached Images Row Preview
@@ -219,33 +270,35 @@ fun ChatScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     attachedImages.forEachIndexed { index, att ->
-                        Box(
-                            modifier = Modifier
-                                .size(56.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(OmniaElevatedSurface)
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(8.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
                         ) {
-                            Text(
-                                text = "📷",
-                                modifier = Modifier.align(Alignment.Center),
-                                fontSize = 24.sp
-                            )
-                            IconButton(
-                                onClick = { attachedImages.removeAt(index) },
-                                modifier = Modifier
-                                    .size(20.dp)
-                                    .align(Alignment.TopEnd)
-                                    .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    Icons.Default.Close,
-                                    contentDescription = "Remove attachment",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(12.dp)
+                                    imageVector = Icons.Default.Image,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Attachment ${index + 1}", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface)
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Remove",
+                                    modifier = Modifier
+                                        .size(14.dp)
+                                        .clickable { attachedImages.removeAt(index) },
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
@@ -253,114 +306,124 @@ fun ChatScreen(
                 }
             }
 
-            // Luminous Composer Input Container
+            // Persistent Message Composer
             Surface(
-                color = OmniaCardBg,
-                tonalElevation = 6.dp,
+                color = MaterialTheme.colorScheme.background,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, OmniaElectricViolet.copy(alpha = 0.25f), RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
+                    .imePadding()
             ) {
-                Row(
+                Surface(
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(24.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
                     modifier = Modifier
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
                         .fillMaxWidth()
-                        .padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Decorative Glowing Multi-State AI Orb
-                    AiOrbView(
-                        size = 36.dp,
-                        isStreaming = uiState.isGenerating,
-                        isThinking = uiState.isGenerating && uiState.messages.lastOrNull()?.content.isNullOrEmpty()
-                    )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    IconButton(
-                        onClick = {
-                            photoPickerLauncher.launch(
-                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                            )
-                        },
-                        modifier = Modifier.testTag("attach_image_button")
+                    Row(
+                        verticalAlignment = Alignment.Bottom,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.AttachFile,
-                            contentDescription = "Attach File/Image",
-                            tint = OmniaElectricViolet
+                        // Attachment Button
+                        IconButton(
+                            onClick = {
+                                photoPickerLauncher.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
+                            modifier = Modifier.testTag("attach_image_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AttachFile,
+                                contentDescription = "Attach Image",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+
+                        // Multiline Input Field
+                        OutlinedTextField(
+                            value = inputText,
+                            onValueChange = { inputText = it },
+                            placeholder = {
+                                Text(
+                                    "Message OMNIA MAX...",
+                                    fontSize = 14.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                                )
+                            },
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("chat_text_input"),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.Transparent,
+                                unfocusedBorderColor = Color.Transparent,
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                cursorColor = MaterialTheme.colorScheme.primary
+                            ),
+                            maxLines = 5,
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default)
                         )
-                    }
 
-                    OutlinedTextField(
-                        value = inputText,
-                        onValueChange = { inputText = it },
-                        placeholder = { Text("Ask OMNIA MAX anything...", fontSize = 14.sp, color = OmniaTextMuted) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .testTag("chat_text_input"),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = OmniaPrimaryPurple,
-                            unfocusedBorderColor = OmniaElectricViolet.copy(alpha = 0.3f),
-                            focusedContainerColor = OmniaElevatedSurface,
-                            unfocusedContainerColor = OmniaElevatedSurface,
-                            focusedTextColor = OmniaTextPrimary,
-                            unfocusedTextColor = OmniaTextPrimary
-                        ),
-                        maxLines = 4
-                    )
+                        Spacer(modifier = Modifier.width(4.dp))
 
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    AnimatedContent(
-                        targetState = uiState.isGenerating,
-                        transitionSpec = {
-                            (scaleIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn()) togetherWith
-                                    (scaleOut(animationSpec = spring(stiffness = Spring.StiffnessHigh)) + fadeOut())
-                        },
-                        label = "send_stop_button_morph"
-                    ) { isGenerating ->
-                        if (isGenerating) {
-                            IconButton(
-                                onClick = { viewModel.stopGeneration() },
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .background(Color(0xFFFF5252), CircleShape)
-                                    .testTag("stop_generation_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Stop,
-                                    contentDescription = "Stop Generation",
-                                    tint = Color.White
-                                )
-                            }
-                        } else {
-                            IconButton(
-                                onClick = {
-                                    if (inputText.isNotBlank() || attachedImages.isNotEmpty()) {
-                                        val textToSend = inputText
-                                        val attsToSend = attachedImages.toList()
-                                        inputText = ""
-                                        attachedImages.clear()
-                                        viewModel.sendMessage(textToSend, attsToSend)
-                                    }
-                                },
-                                enabled = inputText.isNotBlank() || attachedImages.isNotEmpty(),
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .background(
-                                        if (inputText.isNotBlank() || attachedImages.isNotEmpty()) OmniaPrimaryPurple
-                                        else OmniaElevatedSurface,
-                                        CircleShape
+                        // Morphing Send / Stop Button
+                        AnimatedContent(
+                            targetState = uiState.isGenerating,
+                            transitionSpec = {
+                                (scaleIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn()) togetherWith
+                                        (scaleOut(animationSpec = spring(stiffness = Spring.StiffnessHigh)) + fadeOut())
+                            },
+                            label = "send_stop_button_morph"
+                        ) { isGenerating ->
+                            if (isGenerating) {
+                                IconButton(
+                                    onClick = { viewModel.stopGeneration() },
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .background(MaterialTheme.colorScheme.error, CircleShape)
+                                        .testTag("stop_generation_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Stop,
+                                        contentDescription = "Stop Generation",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(18.dp)
                                     )
-                                    .testTag("send_message_button")
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.Send,
-                                    contentDescription = "Send Message",
-                                    tint = if (inputText.isNotBlank() || attachedImages.isNotEmpty()) Color.White
-                                    else OmniaTextMuted
-                                )
+                                }
+                            } else {
+                                val canSend = inputText.isNotBlank() || attachedImages.isNotEmpty()
+                                IconButton(
+                                    onClick = {
+                                        if (canSend) {
+                                            val textToSend = inputText
+                                            val attsToSend = attachedImages.toList()
+                                            inputText = ""
+                                            attachedImages.clear()
+                                            keyboardController?.hide()
+                                            viewModel.sendMessage(textToSend, attsToSend)
+                                        }
+                                    },
+                                    enabled = canSend,
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .background(
+                                            if (canSend) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                            CircleShape
+                                        )
+                                        .testTag("send_message_button")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.Send,
+                                        contentDescription = "Send Message",
+                                        tint = if (canSend) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -369,57 +432,79 @@ fun ChatScreen(
         }
     }
 
-    if (uiState.systemPromptSheetOpen) {
-        ModalBottomSheet(
-            onDismissRequest = { viewModel.setSystemPromptSheetOpen(false) },
-            containerColor = OmniaCardBg,
-            contentColor = OmniaTextPrimary
+    // Model Selector Bottom Sheet
+    if (isModelSheetOpen) {
+        ModelSelectorSheet(
+            activeProvider = uiState.activeProvider,
+            selectedModelId = uiState.selectedModelId,
+            availableModels = uiState.availableModels,
+            onModelSelected = { modelId ->
+                viewModel.setSelectedModel(modelId)
+            },
+            onCustomModelAdded = { customId ->
+                viewModel.setSelectedModel(customId)
+            },
+            onDismissRequest = { isModelSheetOpen = false }
+        )
+    }
+}
+
+@Composable
+private fun WelcomeStateView(
+    onPromptSelected: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        AiOrbView(size = 48.dp, isPulsing = true)
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "How can I help you today?",
+            style = MaterialTheme.typography.headlineSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+
+        Spacer(modifier = Modifier.height(28.dp))
+
+        val suggestions = listOf(
+            Pair("Explain a topic", "Explain quantum computing in simple terms"),
+            Pair("Help with coding", "Write a Python script to parse JSON data"),
+            Pair("Summarize a document", "Summarize key points from a long article"),
+            Pair("Brainstorm ideas", "Brainstorm 5 innovative startup ideas for 2026")
+        )
+
+        Column(
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.fillMaxWidth()
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp)
-            ) {
-                Text(
-                    text = "Custom System Instructions",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = OmniaTextPrimary
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Configure how OMNIA MAX behaves, responds, and formats output for this conversation.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = OmniaTextSecondary
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-
-                OutlinedTextField(
-                    value = systemInstructionText,
-                    onValueChange = { systemInstructionText = it },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(140.dp)
-                        .testTag("system_instruction_input"),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+            suggestions.forEach { (title, prompt) ->
+                Surface(
+                    onClick = { onPromptSelected(prompt) },
+                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    TextButton(onClick = { viewModel.setSystemPromptSheetOpen(false) }) {
-                        Text("Cancel", color = OmniaTextSecondary)
-                    }
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Button(
-                        onClick = { viewModel.updateSystemInstruction(systemInstructionText) },
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = OmniaPrimaryPurple)
-                    ) {
-                        Text("Save Instructions", color = Color.White)
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = title,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = prompt,
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 }
             }
@@ -428,7 +513,7 @@ fun ChatScreen(
 }
 
 @Composable
-fun ChatMessageBubble(
+private fun ChatMessageBubble(
     message: ChatMessage,
     onCopyClicked: () -> Unit,
     onRegenerateClicked: () -> Unit
@@ -436,67 +521,83 @@ fun ChatMessageBubble(
     val isUser = message.sender == MessageSender.USER
 
     Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
+        horizontalAlignment = if (isUser) Alignment.End else Alignment.Start,
+        modifier = Modifier.fillMaxWidth()
     ) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(bottom = 4.dp)
-        ) {
-            Text(
-                text = if (isUser) "You" else (message.agentName ?: "OMNIA MAX"),
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = OmniaTextSecondary
-            )
-        }
+        // Sender Header Label
+        Text(
+            text = if (isUser) "You" else "OMNIA MAX",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = 4.dp, start = 4.dp, end = 4.dp)
+        )
 
         Surface(
-            color = if (isUser) OmniaElevatedSurface else OmniaCardBg,
-            shape = RoundedCornerShape(
-                topStart = 16.dp,
-                topEnd = 16.dp,
-                bottomStart = if (isUser) 16.dp else 4.dp,
-                bottomEnd = if (isUser) 4.dp else 16.dp
-            ),
-            modifier = Modifier
-                .widthIn(max = 320.dp)
-                .border(
-                    1.dp,
-                    if (isUser) OmniaPrimaryPurple.copy(alpha = 0.4f) else OmniaElectricViolet.copy(alpha = 0.2f),
-                    RoundedCornerShape(
-                        topStart = 16.dp,
-                        topEnd = 16.dp,
-                        bottomStart = if (isUser) 16.dp else 4.dp,
-                        bottomEnd = if (isUser) 4.dp else 16.dp
-                    )
-                )
+            color = if (isUser) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.background,
+            shape = RoundedCornerShape(14.dp),
+            border = if (!isUser) androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outline) else null,
+            modifier = Modifier.widthIn(max = 560.dp)
         ) {
-            Column(modifier = Modifier.padding(14.dp)) {
+            Column(modifier = Modifier.padding(12.dp)) {
                 if (message.status == MessageStatus.STREAMING && message.content.isEmpty()) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CircularProgressIndicator(
                             modifier = Modifier.size(16.dp),
                             strokeWidth = 2.dp,
-                            color = OmniaPrimaryPurple
+                            color = MaterialTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("Thinking & Generating...", fontSize = 13.sp, color = OmniaTextSecondary)
+                        Text(
+                            "Thinking...",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
                 } else {
                     MarkdownText(text = message.content)
                 }
 
+                // Explicit Recoverable Error Card (Fix for BUG E)
                 if (message.status == MessageStatus.ERROR) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "Error: ${message.errorMessage ?: "Failed to generate response"}",
-                        color = Color(0xFFFF5252),
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Surface(
+                        color = MaterialTheme.colorScheme.error.copy(alpha = 0.1f),
+                        shape = RoundedCornerShape(8.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.4f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Text(
+                                text = message.errorMessage ?: "Request failed. Please verify your API key and model selection.",
+                                color = MaterialTheme.colorScheme.error,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            TextButton(
+                                onClick = onRegenerateClicked,
+                                contentPadding = PaddingValues(0.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Refresh,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    "Retry Request",
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
                 }
 
+                // Actions Row (Copy, Regenerate)
                 if (!isUser && (message.status == MessageStatus.SUCCESS || message.content.isNotEmpty())) {
                     var isCopied by remember { mutableStateOf(false) }
                     val scope = rememberCoroutineScope()
@@ -511,36 +612,18 @@ fun ChatMessageBubble(
                                 onCopyClicked()
                                 isCopied = true
                                 scope.launch {
-                                    kotlinx.coroutines.delay(1800)
+                                    delay(1800)
                                     isCopied = false
                                 }
                             },
                             modifier = Modifier.size(24.dp)
                         ) {
-                            AnimatedContent(
-                                targetState = isCopied,
-                                transitionSpec = {
-                                    (scaleIn(animationSpec = spring(stiffness = Spring.StiffnessMediumLow)) + fadeIn()) togetherWith
-                                            (scaleOut(animationSpec = spring(stiffness = Spring.StiffnessHigh)) + fadeOut())
-                                },
-                                label = "msg_copy_anim"
-                            ) { copied ->
-                                if (copied) {
-                                    Icon(
-                                        Icons.Default.Check,
-                                        contentDescription = "Copied",
-                                        modifier = Modifier.size(14.dp),
-                                        tint = OmniaSuccessGreen
-                                    )
-                                } else {
-                                    Icon(
-                                        Icons.Default.ContentCopy,
-                                        contentDescription = "Copy message",
-                                        modifier = Modifier.size(14.dp),
-                                        tint = OmniaTextSecondary
-                                    )
-                                }
-                            }
+                            Icon(
+                                imageVector = if (isCopied) Icons.Default.Check else Icons.Default.ContentCopy,
+                                contentDescription = "Copy message",
+                                modifier = Modifier.size(14.dp),
+                                tint = if (isCopied) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                         Spacer(modifier = Modifier.width(8.dp))
                         IconButton(
@@ -548,81 +631,14 @@ fun ChatMessageBubble(
                             modifier = Modifier.size(24.dp)
                         ) {
                             Icon(
-                                Icons.Default.Refresh,
+                                imageVector = Icons.Default.Refresh,
                                 contentDescription = "Regenerate response",
                                 modifier = Modifier.size(14.dp),
-                                tint = OmniaTextSecondary
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-fun EmptyChatWelcomeView(
-    activeModelId: String,
-    onPromptSuggested: (String) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        AiOrbView(size = 80.dp, isPulsing = true)
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Text(
-            text = "Welcome to OMNIA MAX",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
-            color = OmniaTextPrimary
-        )
-
-        Text(
-            text = "Active Model: $activeModelId",
-            style = MaterialTheme.typography.bodyMedium,
-            color = OmniaElectricViolet
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-
-        Text(
-            text = "Suggested Prompts",
-            style = MaterialTheme.typography.labelLarge,
-            color = OmniaLavenderHighlight,
-            fontWeight = FontWeight.Bold
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        val prompts = listOf(
-            "Architect a high-performance Kotlin Android app with clean architecture.",
-            "Explain quantum computing principles with code examples.",
-            "Run a multi-agent security audit on my authentication logic."
-        )
-
-        prompts.forEach { prompt ->
-            OutlinedCard(
-                onClick = { onPromptSuggested(prompt) },
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.outlinedCardColors(containerColor = OmniaCardBg),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp)
-                    .border(1.dp, OmniaElectricViolet.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-            ) {
-                Text(
-                    text = prompt,
-                    modifier = Modifier.padding(12.dp),
-                    fontSize = 13.sp,
-                    color = OmniaTextPrimary
-                )
             }
         }
     }

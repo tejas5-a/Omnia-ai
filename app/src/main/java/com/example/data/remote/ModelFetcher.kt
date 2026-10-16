@@ -191,12 +191,12 @@ object ModelFetcher {
     fun getFallbackModels(type: ProviderType): List<AIModel> {
         return when (type) {
             ProviderType.GEMINI -> listOf(
-                AIModel("gemini-4-argon", "Gemini 4 Argon (High Thinking)", ProviderType.GEMINI, "ID: gemini-4-argon", 1000000, isFreeTier = true, supportsThinking = true, supportsVision = true),
-                AIModel("gemini-3.6-flash", "Gemini 3.6 Flash (Recommended)", ProviderType.GEMINI, "ID: gemini-3.6-flash", 1000000, isFreeTier = true, supportsThinking = true, supportsVision = true),
-                AIModel("gemini-3.1-pro-preview", "Gemini 3.1 Pro Preview", ProviderType.GEMINI, "ID: gemini-3.1-pro-preview", 2000000, isFreeTier = true, supportsThinking = true, supportsVision = true),
-                AIModel("gemini-3.5-flash", "Gemini 3.5 Flash", ProviderType.GEMINI, "ID: gemini-3.5-flash", 1000000, isFreeTier = true, supportsThinking = false),
-                AIModel("gemini-2.5-flash", "Gemini 2.5 Flash", ProviderType.GEMINI, "ID: gemini-2.5-flash", 1000000, isFreeTier = true, supportsVision = true)
+                AIModel("gemini-2.5-flash", "Gemini 2.5 Flash (Recommended)", ProviderType.GEMINI, "ID: gemini-2.5-flash", 1000000, isFreeTier = true, supportsThinking = true, supportsVision = true),
+                AIModel("gemini-2.5-pro", "Gemini 2.5 Pro (Deep Reasoning)", ProviderType.GEMINI, "ID: gemini-2.5-pro", 2000000, isFreeTier = true, supportsThinking = true, supportsVision = true),
+                AIModel("gemini-2.0-flash", "Gemini 2.0 Flash", ProviderType.GEMINI, "ID: gemini-2.0-flash", 1000000, isFreeTier = true, supportsThinking = false),
+                AIModel("gemini-1.5-flash", "Gemini 1.5 Flash", ProviderType.GEMINI, "ID: gemini-1.5-flash", 1000000, isFreeTier = true, supportsVision = true)
             )
+
             ProviderType.OPENAI -> listOf(
                 AIModel("gpt-4o", "GPT-4o (Omni)", ProviderType.OPENAI, "ID: gpt-4o", 128000, supportsVision = true),
                 AIModel("gpt-4o-mini", "GPT-4o Mini", ProviderType.OPENAI, "ID: gpt-4o-mini", 128000, supportsVision = true),
