@@ -61,6 +61,7 @@ fun ChatScreen(
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
     val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
     var inputText by remember { mutableStateOf("") }
     var isModelSheetOpen by remember { mutableStateOf(false) }
@@ -192,6 +193,7 @@ fun ChatScreen(
             )
         },
         containerColor = MaterialTheme.colorScheme.background,
+        contentWindowInsets = WindowInsets.statusBars,
         modifier = modifier
     ) { innerPadding ->
         Column(
@@ -311,7 +313,7 @@ fun ChatScreen(
                 color = MaterialTheme.colorScheme.background,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .imePadding()
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom))
             ) {
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,
@@ -404,6 +406,7 @@ fun ChatScreen(
                                             val attsToSend = attachedImages.toList()
                                             inputText = ""
                                             attachedImages.clear()
+                                            focusManager.clearFocus()
                                             keyboardController?.hide()
                                             viewModel.sendMessage(textToSend, attsToSend)
                                         }

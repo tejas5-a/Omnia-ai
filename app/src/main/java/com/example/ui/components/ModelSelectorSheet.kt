@@ -46,6 +46,7 @@ fun ModelSelectorSheet(
 
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
+    val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
     val filteredModels = remember(availableModels, searchQuery) {
         if (searchQuery.isBlank()) availableModels
@@ -129,11 +130,12 @@ fun ModelSelectorSheet(
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                             keyboardActions = KeyboardActions(
-                                onDone = {
+                                 onDone = {
                                     if (customModelIdText.isNotBlank()) {
+                                        focusManager.clearFocus()
+                                        keyboardController?.hide()
                                         onCustomModelAdded(customModelIdText.trim())
                                         onModelSelected(customModelIdText.trim())
-                                        keyboardController?.hide()
                                         onDismissRequest()
                                     }
                                 }
@@ -151,9 +153,10 @@ fun ModelSelectorSheet(
                         Button(
                             onClick = {
                                 if (customModelIdText.isNotBlank()) {
+                                    focusManager.clearFocus()
+                                    keyboardController?.hide()
                                     onCustomModelAdded(customModelIdText.trim())
                                     onModelSelected(customModelIdText.trim())
-                                    keyboardController?.hide()
                                     onDismissRequest()
                                 }
                             },
