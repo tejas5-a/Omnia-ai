@@ -45,6 +45,8 @@ import com.example.data.model.MessageStatus
 import com.example.ui.components.AiOrbView
 import com.example.ui.components.MarkdownText
 import com.example.ui.components.ModelSelectorSheet
+import com.example.ui.components.PollinationsInlineImageViewer
+import com.example.util.PollinationsImageHelper
 import com.example.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -638,7 +640,24 @@ private fun ChatMessageBubble(
                         )
                     }
                 } else {
-                    MarkdownText(text = message.content)
+                    val imageUrls = remember(message.content) {
+                        PollinationsImageHelper.extractImageUrls(message.content)
+                    }
+                    val cleanText = remember(message.content, imageUrls) {
+                        if (imageUrls.isNotEmpty()) {
+                            PollinationsImageHelper.stripImageUrlsFromText(message.content, imageUrls)
+                        } else {
+                            message.content
+                        }
+                    }
+
+                    if (cleanText.isNotBlank()) {
+                        MarkdownText(text = cleanText)
+                    }
+
+                    for (url in imageUrls) {
+                        PollinationsInlineImageViewer(imageUrl = url)
+                    }
                 }
 
                 // Explicit Recoverable Error Card (Fix for BUG E)
