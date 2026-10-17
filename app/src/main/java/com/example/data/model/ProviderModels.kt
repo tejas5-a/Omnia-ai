@@ -4,6 +4,7 @@ enum class ProviderType(val displayName: String, val defaultBaseUrl: String) {
     GEMINI("Google Gemini", "https://generativelanguage.googleapis.com/"),
     OPENAI("OpenAI", "https://api.openai.com/v1/"),
     OPENROUTER("OpenRouter", "https://openrouter.ai/api/v1/"),
+    POLLINATIONS("Pollinations AI", "https://gen.pollinations.ai/v1/"),
     CUSTOM("Custom / OpenAI Compatible", "http://localhost:11434/v1/")
 }
 

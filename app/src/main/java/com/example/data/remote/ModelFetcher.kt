@@ -147,6 +147,64 @@ object ModelFetcher {
                 }
             }
 
+            ProviderType.POLLINATIONS -> {
+                val baseUrl = config.baseUrl.ifBlank { ProviderType.POLLINATIONS.defaultBaseUrl }.trimEnd('/')
+                val url = if (baseUrl.endsWith("/models")) baseUrl else "$baseUrl/models"
+                val requestBuilder = Request.Builder().url(url).get()
+                if (config.apiKey.isNotBlank()) {
+                    requestBuilder.addHeader("Authorization", "Bearer ${config.apiKey}")
+                }
+                client.newCall(requestBuilder.build()).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        val errBody = response.body?.string() ?: ""
+                        throw FetchException("Pollinations AI Error (HTTP ${response.code}): $errBody")
+                    }
+                    val bodyString = response.body?.string() ?: ""
+                    if (bodyString.trim().startsWith("[")) {
+                        val array = org.json.JSONArray(bodyString)
+                        for (i in 0 until array.length()) {
+                            val item = array.get(i)
+                            val modelId = if (item is JSONObject) item.optString("id", item.optString("name", "")) else item.toString()
+                            val displayName = if (item is JSONObject) item.optString("name", modelId) else modelId
+                            val desc = if (item is JSONObject) item.optString("description", "Pollinations AI Model ($modelId)") else "Pollinations AI Model"
+                            if (modelId.isNotBlank()) {
+                                modelsList.add(
+                                    AIModel(
+                                        id = modelId,
+                                        name = displayName,
+                                        providerType = ProviderType.POLLINATIONS,
+                                        description = desc,
+                                        contextLength = 128000,
+                                        isFreeTier = true
+                                    )
+                                )
+                            }
+                        }
+                    } else {
+                        val json = JSONObject(bodyString)
+                        val dataArray = json.optJSONArray("data") ?: json.optJSONArray("models") ?: org.json.JSONArray()
+                        for (i in 0 until dataArray.length()) {
+                            val obj = dataArray.getJSONObject(i)
+                            val modelId = obj.optString("id", obj.optString("name", ""))
+                            val displayName = obj.optString("name", modelId)
+                            val desc = obj.optString("description", "Pollinations AI Model ($modelId)")
+                            if (modelId.isNotBlank()) {
+                                modelsList.add(
+                                    AIModel(
+                                        id = modelId,
+                                        name = displayName,
+                                        providerType = ProviderType.POLLINATIONS,
+                                        description = desc,
+                                        contextLength = 128000,
+                                        isFreeTier = true
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             ProviderType.CUSTOM -> {
                 val baseUrl = config.baseUrl.ifBlank { ProviderType.CUSTOM.defaultBaseUrl }.trimEnd('/')
                 val url = if (baseUrl.endsWith("/models")) baseUrl else "$baseUrl/models"
@@ -206,6 +264,13 @@ object ModelFetcher {
                 AIModel("google/gemini-2.0-flash-lite:free", "Gemini 2.0 Flash Lite (Free)", ProviderType.OPENROUTER, "ID: google/gemini-2.0-flash-lite:free", 1000000, isFreeTier = true),
                 AIModel("deepseek/deepseek-r1:free", "DeepSeek R1 Reasoning (Free)", ProviderType.OPENROUTER, "ID: deepseek/deepseek-r1:free", 64000, isFreeTier = true, supportsThinking = true),
                 AIModel("meta-llama/llama-3.3-70b-instruct:free", "Llama 3.3 70B (Free)", ProviderType.OPENROUTER, "ID: meta-llama/llama-3.3-70b-instruct:free", 128000, isFreeTier = true)
+            )
+            ProviderType.POLLINATIONS -> listOf(
+                AIModel("openai", "OpenAI GPT-4o (Pollinations)", ProviderType.POLLINATIONS, "ID: openai", 128000, isFreeTier = true, supportsVision = true),
+                AIModel("qwen-coder", "Qwen 2.5 Coder (Pollinations)", ProviderType.POLLINATIONS, "ID: qwen-coder", 128000, isFreeTier = true),
+                AIModel("llama", "Llama 3.3 70B (Pollinations)", ProviderType.POLLINATIONS, "ID: llama", 128000, isFreeTier = true),
+                AIModel("mistral", "Mistral Small (Pollinations)", ProviderType.POLLINATIONS, "ID: mistral", 32000, isFreeTier = true),
+                AIModel("deepseek", "DeepSeek V3 / R1 (Pollinations)", ProviderType.POLLINATIONS, "ID: deepseek", 64000, isFreeTier = true, supportsThinking = true)
             )
             ProviderType.CUSTOM -> listOf(
                 AIModel("llama3", "Llama 3 Local / Custom", ProviderType.CUSTOM, "ID: llama3", 8192),

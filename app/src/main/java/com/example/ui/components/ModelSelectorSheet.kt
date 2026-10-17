@@ -51,7 +51,7 @@ fun ModelSelectorSheet(
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
-    val providerTabs = listOf("ALL", "GEMINI", "OPENROUTER", "OPENAI", "CUSTOM")
+    val providerTabs = listOf("ALL", "GEMINI", "OPENROUTER", "OPENAI", "POLLINATIONS", "CUSTOM")
 
     val filteredModels = remember(availableModels, searchQuery, selectedProviderTab) {
         availableModels.filter { model ->
@@ -64,6 +64,7 @@ fun ModelSelectorSheet(
                 "GEMINI" -> model.providerType == ProviderType.GEMINI
                 "OPENROUTER" -> model.providerType == ProviderType.OPENROUTER
                 "OPENAI" -> model.providerType == ProviderType.OPENAI
+                "POLLINATIONS" -> model.providerType == ProviderType.POLLINATIONS
                 "CUSTOM" -> model.providerType == ProviderType.CUSTOM
                 else -> true
             }

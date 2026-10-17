@@ -15,7 +15,8 @@ data class UserPreferences(
     val themeMode: String = "DARK", // "DARK", "LIGHT", "SYSTEM"
     val defaultSystemPrompt: String = "You are OMNIA MAX, an elite AI assistant.",
     val isHighThinking: Boolean = false,
-    val lastScreen: String = "chat"
+    val lastScreen: String = "chat",
+    val lastActiveThreadId: String = ""
 )
 
 class AppPreferencesRepository(context: Context) {
@@ -34,7 +35,8 @@ class AppPreferencesRepository(context: Context) {
             themeMode = prefs.getString("themeMode", "DARK") ?: "DARK",
             defaultSystemPrompt = prefs.getString("defaultSystemPrompt", "You are OMNIA MAX, an elite AI assistant.") ?: "You are OMNIA MAX, an elite AI assistant.",
             isHighThinking = prefs.getBoolean("isHighThinking", false),
-            lastScreen = prefs.getString("lastScreen", "chat") ?: "chat"
+            lastScreen = prefs.getString("lastScreen", "chat") ?: "chat",
+            lastActiveThreadId = prefs.getString("lastActiveThreadId", "") ?: ""
         )
     }
 
@@ -84,5 +86,10 @@ class AppPreferencesRepository(context: Context) {
         if (screen == "welcome") return // Never save welcome screen
         prefs.edit().putString("lastScreen", screen).apply()
         _userPreferences.update { it.copy(lastScreen = screen) }
+    }
+
+    fun updateLastActiveThreadId(threadId: String) {
+        prefs.edit().putString("lastActiveThreadId", threadId).apply()
+        _userPreferences.update { it.copy(lastActiveThreadId = threadId) }
     }
 }

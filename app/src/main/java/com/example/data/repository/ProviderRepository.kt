@@ -31,6 +31,7 @@ class ProviderRepository(
             val geminiKey = securePrefs.getDecryptedKey("gemini_api_key", com.example.BuildConfig.GEMINI_API_KEY)
             val openaiKey = securePrefs.getDecryptedKey("openai_api_key", "")
             val openrouterKey = securePrefs.getDecryptedKey("openrouter_api_key", "")
+            val pollinationsKey = securePrefs.getDecryptedKey("pollinations_api_key", "")
             val customKey = securePrefs.getDecryptedKey("custom_api_key", "")
 
             val defaults = listOf(
@@ -65,6 +66,16 @@ class ProviderRepository(
                     fetchedModels = ModelFetcher.getFallbackModels(ProviderType.OPENROUTER)
                 ),
                 ProviderConfig(
+                    id = "pollinations",
+                    name = "Pollinations AI",
+                    type = ProviderType.POLLINATIONS,
+                    apiKey = pollinationsKey,
+                    baseUrl = ProviderType.POLLINATIONS.defaultBaseUrl,
+                    selectedModel = "openai",
+                    enabled = false,
+                    fetchedModels = ModelFetcher.getFallbackModels(ProviderType.POLLINATIONS)
+                ),
+                ProviderConfig(
                     id = "custom",
                     name = "Custom / OpenAI Endpoint",
                     type = ProviderType.CUSTOM,
@@ -79,6 +90,19 @@ class ProviderRepository(
             defaults.forEach { config ->
                 providerDao.insertProvider(config.toEntity())
             }
+        } else if (existing.none { it.id == "pollinations" }) {
+            val pollinationsKey = securePrefs.getDecryptedKey("pollinations_api_key", "")
+            val pollinationsConfig = ProviderConfig(
+                id = "pollinations",
+                name = "Pollinations AI",
+                type = ProviderType.POLLINATIONS,
+                apiKey = pollinationsKey,
+                baseUrl = ProviderType.POLLINATIONS.defaultBaseUrl,
+                selectedModel = "openai",
+                enabled = false,
+                fetchedModels = ModelFetcher.getFallbackModels(ProviderType.POLLINATIONS)
+            )
+            providerDao.insertProvider(pollinationsConfig.toEntity())
         }
     }
 

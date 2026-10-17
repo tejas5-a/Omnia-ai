@@ -137,7 +137,7 @@ object LLMStreamService {
                 }
             }
 
-            ProviderType.OPENAI, ProviderType.OPENROUTER, ProviderType.CUSTOM -> {
+            ProviderType.OPENAI, ProviderType.OPENROUTER, ProviderType.POLLINATIONS, ProviderType.CUSTOM -> {
                 val baseUrl = provider.baseUrl.ifBlank { provider.type.defaultBaseUrl }.trimEnd('/')
                 val url = if (baseUrl.endsWith("/chat/completions")) baseUrl else "$baseUrl/chat/completions"
 

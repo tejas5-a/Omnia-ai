@@ -72,17 +72,30 @@ class ChatViewModel(
             }
         }
 
-        // 3. Sync chat threads and active thread
+        // 3. Sync chat threads and active thread reliably
         viewModelScope.launch {
             chatRepository.allThreads.collect { threads ->
                 if (threads.isEmpty()) {
                     val defaultModel = appPrefs.userPreferences.value.selectedModelId.ifBlank { "gemini-2.5-flash" }
                     val newT = chatRepository.createNewThread(modelId = defaultModel)
+                    appPrefs.updateLastActiveThreadId(newT.id)
                     selectThread(newT.id)
                 } else {
-                    val currentActive = _uiState.value.activeThread
-                    val activeId = currentActive?.id ?: threads.first().id
-                    val activeThread = threads.firstOrNull { it.id == activeId } ?: threads.first()
+                    val currentActiveId = _uiState.value.activeThread?.id
+                    val savedActiveId = appPrefs.userPreferences.value.lastActiveThreadId
+
+                    val targetId = when {
+                        currentActiveId != null && threads.any { it.id == currentActiveId } -> currentActiveId
+                        savedActiveId.isNotBlank() && threads.any { it.id == savedActiveId } -> savedActiveId
+                        else -> threads.first().id
+                    }
+
+                    val activeThread = threads.firstOrNull { it.id == targetId } ?: threads.first()
+
+                    if (savedActiveId != activeThread.id) {
+                        appPrefs.updateLastActiveThreadId(activeThread.id)
+                    }
+
                     _uiState.update {
                         it.copy(
                             threads = threads,
@@ -101,8 +114,8 @@ class ChatViewModel(
         messageObserverJob?.cancel()
         messageObserverJob = viewModelScope.launch {
             chatRepository.getMessagesForThread(threadId).collect { msgs ->
-                // Only sync from DB when not actively streaming in memory
-                if (!_uiState.value.isGenerating) {
+                // Ensure messages belong to currently active thread and not during active streaming override
+                if (_uiState.value.activeThread?.id == threadId && !_uiState.value.isGenerating) {
                     _uiState.update { it.copy(messages = msgs) }
                 }
             }
@@ -110,9 +123,11 @@ class ChatViewModel(
     }
 
     fun selectThread(threadId: String) {
+        if (threadId.isBlank()) return
         viewModelScope.launch {
             val thread = chatRepository.getThreadById(threadId)
             if (thread != null) {
+                appPrefs.updateLastActiveThreadId(thread.id)
                 _uiState.update {
                     it.copy(
                         activeThread = thread,
@@ -120,21 +135,39 @@ class ChatViewModel(
                         isHighThinking = thread.isHighThinking
                     )
                 }
-                appPrefs.updateSelectedModelId(thread.modelId)
-                observeMessagesForThread(threadId)
+                if (thread.modelId.isNotBlank()) {
+                    appPrefs.updateSelectedModelId(thread.modelId)
+                }
+                observeMessagesForThread(thread.id)
             }
         }
     }
 
     fun createNewThread() {
         viewModelScope.launch {
+            val currentThread = _uiState.value.activeThread
+            val currentMsgs = _uiState.value.messages
+            if (currentThread != null && currentThread.title == "New Conversation" && currentMsgs.isEmpty()) {
+                appPrefs.updateLastActiveThreadId(currentThread.id)
+                return@launch
+            }
+
             val provider = providerRepository.getActiveProvider()
             val currentModel = appPrefs.userPreferences.value.selectedModelId.ifBlank { provider.selectedModel }
             val newThread = chatRepository.createNewThread(
                 modelId = currentModel,
                 providerType = provider.type
             )
-            selectThread(newThread.id)
+            appPrefs.updateLastActiveThreadId(newThread.id)
+            _uiState.update {
+                it.copy(
+                    activeThread = newThread,
+                    messages = emptyList(),
+                    selectedModelId = newThread.modelId.ifBlank { appPrefs.userPreferences.value.selectedModelId },
+                    isHighThinking = newThread.isHighThinking
+                )
+            }
+            observeMessagesForThread(newThread.id)
         }
     }
 
@@ -146,6 +179,7 @@ class ChatViewModel(
             if (activeThread == null) {
                 val currentModel = appPrefs.userPreferences.value.selectedModelId.ifBlank { "gemini-2.5-flash" }
                 activeThread = chatRepository.createNewThread(modelId = currentModel)
+                appPrefs.updateLastActiveThreadId(activeThread.id)
                 _uiState.update { it.copy(activeThread = activeThread) }
             }
 
@@ -161,6 +195,8 @@ class ChatViewModel(
             if (_uiState.value.messages.isEmpty() || activeThread.title == "New Conversation") {
                 val title = if (promptText.length > 30) promptText.take(28) + "..." else promptText
                 chatRepository.renameThread(activeThread.id, title)
+                val updatedThread = activeThread.copy(title = title)
+                _uiState.update { it.copy(activeThread = updatedThread) }
             }
 
             triggerAiResponse(activeThread)
@@ -276,6 +312,15 @@ class ChatViewModel(
     fun deleteThread(threadId: String) {
         viewModelScope.launch {
             chatRepository.deleteThread(threadId)
+            if (_uiState.value.activeThread?.id == threadId) {
+                val remaining = _uiState.value.threads.filter { it.id != threadId }
+                val next = remaining.firstOrNull()
+                if (next != null) {
+                    selectThread(next.id)
+                } else {
+                    createNewThread()
+                }
+            }
         }
     }
 
