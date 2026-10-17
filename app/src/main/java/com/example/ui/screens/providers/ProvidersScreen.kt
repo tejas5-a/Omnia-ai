@@ -39,7 +39,7 @@ fun ProvidersScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "API Provider Hub",
+                        "Provider & API Settings",
                         fontWeight = FontWeight.Bold,
                         color = OmniaTextPrimary,
                         fontSize = 18.sp

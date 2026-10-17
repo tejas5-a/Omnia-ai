@@ -4,48 +4,52 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 // ==========================================
-// CHATGPT NEUTRAL PALETTE — OMNIA MAX
+// OMNIA MAX PREMIUM PALETTE
 // ==========================================
 
 // DARK MODE (DEFAULT)
-val ChatDarkMainBg = Color(0xFF212121)
-val ChatDarkDrawerBg = Color(0xFF171717)
-val ChatDarkChatBg = Color(0xFF212121)
-val ChatDarkComposerBg = Color(0xFF303030)
-val ChatDarkSurfaceSecondary = Color(0xFF2A2A2A)
-val ChatDarkBorderDivider = Color(0xFF424242)
-val ChatDarkTextPrimary = Color(0xFFF5F5F5)
-val ChatDarkTextSecondary = Color(0xFFB4B4B4)
-val ChatDarkTextMuted = Color(0xFF8E8E8E)
-val ChatDarkBtnBg = Color(0xFFFFFFFF)
-val ChatDarkBtnText = Color(0xFF171717)
-val ChatDarkSelectedItemBg = Color(0xFF303030)
-val ChatDarkErrorRed = Color(0xFFFF6B6B)
-val ChatDarkSuccessGreen = Color(0xFF81C995)
+val ChatDarkMainBg = Color(0xFF121212)
+val ChatDarkDrawerBg = Color(0xFF171B27)
+val ChatDarkChatBg = Color(0xFF121212)
+val ChatDarkComposerBg = Color(0xFF242A35)
+val ChatDarkSurfaceSecondary = Color(0xFF202635)
+val ChatDarkElevatedSurface = Color(0xFF282F40)
+val ChatDarkBorderDivider = Color(0xFF343C4C)
+val ChatDarkTextPrimary = Color(0xFFF5F7FA)
+val ChatDarkTextSecondary = Color(0xFFA7B0C0)
+val ChatDarkTextMuted = Color(0xFF778196)
+val ChatDarkBtnBg = Color(0xFF3478F6)
+val ChatDarkBtnText = Color(0xFFFFFFFF)
+val ChatDarkSelectedItemBg = Color(0xFF282F40)
+val ChatDarkErrorRed = Color(0xFFF87171)
+val ChatDarkSuccessGreen = Color(0xFF34D399)
+val ChatDarkSecondaryAccent = Color(0xFF60A5FA)
 
 // LIGHT MODE
 val ChatLightMainBg = Color(0xFFFFFFFF)
-val ChatLightDrawerBg = Color(0xFFF9F9F9)
+val ChatLightDrawerBg = Color(0xFFF8FAFC)
 val ChatLightChatBg = Color(0xFFFFFFFF)
-val ChatLightComposerBg = Color(0xFFF4F4F4)
-val ChatLightSurfaceSecondary = Color(0xFFF7F7F7)
-val ChatLightBorderDivider = Color(0xFFE5E5E5)
-val ChatLightTextPrimary = Color(0xFF0D0D0D)
-val ChatLightTextSecondary = Color(0xFF5D5D5D)
-val ChatLightTextMuted = Color(0xFF8F8F8F)
-val ChatLightBtnBg = Color(0xFF171717)
+val ChatLightComposerBg = Color(0xFFF1F5F9)
+val ChatLightSurfaceSecondary = Color(0xFFF8FAFC)
+val ChatLightElevatedSurface = Color(0xFFE2E8F0)
+val ChatLightBorderDivider = Color(0xFFCBD5E1)
+val ChatLightTextPrimary = Color(0xFF0F172A)
+val ChatLightTextSecondary = Color(0xFF475569)
+val ChatLightTextMuted = Color(0xFF64748B)
+val ChatLightBtnBg = Color(0xFF2563EB)
 val ChatLightBtnText = Color(0xFFFFFFFF)
-val ChatLightSelectedItemBg = Color(0xFFEEEEEE)
-val ChatLightErrorRed = Color(0xFFC62828)
-val ChatLightSuccessGreen = Color(0xFF238636)
+val ChatLightSelectedItemBg = Color(0xFFE2E8F0)
+val ChatLightErrorRed = Color(0xFFEF4444)
+val ChatLightSuccessGreen = Color(0xFF10B981)
+val ChatLightSecondaryAccent = Color(0xFF3B82F6)
 
-// OMNIA MAX Brand Accent Colors (Restrained)
-val OmniaElectricBlue = Color(0xFF1E56FD)
-val OmniaRoyalBlue = Color(0xFF2F80ED)
-val OmniaNeonCyan = Color(0xFF38BDF8)
-val OmniaBrightCyan = Color(0xFF00D2FF)
+// OMNIA Brand Accent Colors
+val OmniaElectricBlue = Color(0xFF3478F6)
+val OmniaRoyalBlue = Color(0xFF2563EB)
+val OmniaNeonCyan = Color(0xFF60A5FA)
+val OmniaBrightCyan = Color(0xFF38BDF8)
 
-// Legacy Aliases for backwards compatibility across all screens
+// Legacy / Compatibility Aliases
 val OmniaPrimaryPurple = OmniaElectricBlue
 val OmniaElectricViolet = OmniaRoyalBlue
 val OmniaLavenderHighlight = OmniaNeonCyan
@@ -61,7 +65,7 @@ val AgentReviewColor = OmniaRoyalBlue
 val OmniaMainBg = ChatDarkMainBg
 val OmniaSecondaryBg = ChatDarkDrawerBg
 val OmniaCardBg = ChatDarkSurfaceSecondary
-val OmniaElevatedSurface = ChatDarkComposerBg
+val OmniaElevatedSurface = ChatDarkElevatedSurface
 val OmniaSubtleBorder = ChatDarkBorderDivider
 val OmniaTextPrimary = ChatDarkTextPrimary
 val OmniaTextSecondary = ChatDarkTextSecondary
@@ -71,10 +75,10 @@ val OmniaSuccessGreen = ChatDarkSuccessGreen
 val OmniaWarningAmber = Color(0xFFF59E0B)
 
 val OmniaPrimaryGradient = Brush.horizontalGradient(
-    colors = listOf(ChatDarkMainBg, ChatDarkSurfaceSecondary)
+    colors = listOf(OmniaElectricBlue, OmniaNeonCyan)
 )
 val OmniaCyanGradient = Brush.horizontalGradient(
-    colors = listOf(OmniaElectricBlue, OmniaNeonCyan)
+    colors = listOf(OmniaElectricBlue, OmniaBrightCyan)
 )
 val OmniaCardBorderGradient = Brush.horizontalGradient(
     colors = listOf(ChatDarkBorderDivider, ChatDarkBorderDivider)

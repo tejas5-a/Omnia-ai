@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -29,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.AIModel
 import com.example.data.model.ProviderConfig
+import com.example.data.model.ProviderType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,6 +43,7 @@ fun ModelSelectorSheet(
     onDismissRequest: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
+    var selectedProviderTab by remember { mutableStateOf("ALL") }
     var showCustomInput by remember { mutableStateOf(false) }
     var customModelIdText by remember { mutableStateOf("") }
 
@@ -48,12 +51,24 @@ fun ModelSelectorSheet(
     val keyboardController = LocalSoftwareKeyboardController.current
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
-    val filteredModels = remember(availableModels, searchQuery) {
-        if (searchQuery.isBlank()) availableModels
-        else availableModels.filter {
-            it.id.contains(searchQuery, ignoreCase = true) ||
-                    it.name.contains(searchQuery, ignoreCase = true) ||
-                    it.description.contains(searchQuery, ignoreCase = true)
+    val providerTabs = listOf("ALL", "GEMINI", "OPENROUTER", "OPENAI", "CUSTOM")
+
+    val filteredModels = remember(availableModels, searchQuery, selectedProviderTab) {
+        availableModels.filter { model ->
+            val matchesSearch = searchQuery.isBlank() ||
+                    model.id.contains(searchQuery, ignoreCase = true) ||
+                    model.name.contains(searchQuery, ignoreCase = true) ||
+                    model.description.contains(searchQuery, ignoreCase = true)
+
+            val matchesTab = when (selectedProviderTab) {
+                "GEMINI" -> model.providerType == ProviderType.GEMINI
+                "OPENROUTER" -> model.providerType == ProviderType.OPENROUTER
+                "OPENAI" -> model.providerType == ProviderType.OPENAI
+                "CUSTOM" -> model.providerType == ProviderType.CUSTOM
+                else -> true
+            }
+
+            matchesSearch && matchesTab
         }
     }
 
@@ -84,7 +99,7 @@ fun ModelSelectorSheet(
                     )
                     activeProvider?.let { provider ->
                         Text(
-                            text = "Provider: ${provider.name}",
+                            text = "Active Provider: ${provider.name}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -103,9 +118,9 @@ fun ModelSelectorSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Custom Model ID Input Toggle Section (Fix for BUG B)
+            // Custom Model ID Input Toggle Section
             AnimatedVisibility(visible = showCustomInput) {
                 Column(
                     modifier = Modifier
@@ -130,7 +145,7 @@ fun ModelSelectorSheet(
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                             keyboardActions = KeyboardActions(
-                                 onDone = {
+                                onDone = {
                                     if (customModelIdText.isNotBlank()) {
                                         focusManager.clearFocus()
                                         keyboardController?.hide()
@@ -178,7 +193,7 @@ fun ModelSelectorSheet(
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                placeholder = { Text("Search available models...", fontSize = 13.sp) },
+                placeholder = { Text("Search models...", fontSize = 13.sp) },
                 leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Search,
@@ -208,7 +223,28 @@ fun ModelSelectorSheet(
                     .testTag("search_models_input")
             )
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Provider Filter Tabs
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                items(providerTabs) { tab ->
+                    val isSelected = selectedProviderTab == tab
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { selectedProviderTab = tab },
+                        label = { Text(tab, fontSize = 11.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
+                            selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Models List
             if (filteredModels.isEmpty()) {
@@ -219,7 +255,7 @@ fun ModelSelectorSheet(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = if (searchQuery.isNotBlank()) "No models matching '$searchQuery'" else "No models available for this provider",
+                        text = if (searchQuery.isNotBlank()) "No models matching '$searchQuery'" else "No models available",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontSize = 13.sp
                     )
@@ -228,7 +264,7 @@ fun ModelSelectorSheet(
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 380.dp),
+                        .heightIn(max = 360.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     items(filteredModels, key = { it.id }) { model ->
@@ -278,7 +314,7 @@ fun ModelSelectorSheet(
                                     }
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = "ID: ${model.id}",
+                                        text = "Provider: ${model.providerType.displayName} • ID: ${model.id}",
                                         fontSize = 11.sp,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         maxLines = 1,

@@ -98,7 +98,7 @@ fun DrawerContent(
                         letterSpacing = 0.5.sp
                     )
                     Text(
-                        text = "ChatGPT-Style AI Assistant",
+                        text = "Smarter AI. Greater Possibilities.",
                         style = MaterialTheme.typography.labelSmall,
                         color = ChatDarkTextSecondary,
                         fontSize = 11.sp
