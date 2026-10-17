@@ -106,11 +106,22 @@ class ProviderRepository(
         }
     }
 
+    suspend fun getProvidersSyncList(): List<ProviderConfig> {
+        return providerDao.getProvidersSync().map { it.toDomainModel() }
+    }
+
+    suspend fun getEnabledProviders(): List<ProviderConfig> {
+        return getProvidersSyncList().filter { it.enabled }
+    }
+
     suspend fun getActiveProvider(): ProviderConfig {
         val activeId = appPrefs.userPreferences.value.activeProviderId
-        val all = providerDao.getProvidersSync().map { it.toDomainModel() }
+        val all = getProvidersSyncList()
 
-        val active = all.firstOrNull { it.id == activeId } ?: all.firstOrNull { it.enabled }
+        val active = all.firstOrNull { it.id == activeId && it.enabled }
+            ?: all.firstOrNull { it.enabled && it.type != ProviderType.POLLINATIONS }
+            ?: all.firstOrNull { it.enabled }
+
         if (active != null) return active
 
         return all.firstOrNull { it.type == ProviderType.GEMINI } ?: ProviderConfig(
@@ -123,18 +134,12 @@ class ProviderRepository(
             enabled = true,
             fetchedModels = ModelFetcher.getFallbackModels(ProviderType.GEMINI)
         )
-
     }
 
     suspend fun saveProvider(provider: ProviderConfig) {
         // Securely store API key in Keystore
         securePrefs.saveEncryptedKey("${provider.id}_api_key", provider.apiKey)
         providerDao.insertProvider(provider.toEntity())
-
-        if (provider.enabled) {
-            appPrefs.updateActiveProviderId(provider.id)
-            appPrefs.updateSelectedModelId(provider.selectedModel)
-        }
     }
 
     suspend fun fetchModelsForProvider(provider: ProviderConfig): List<AIModel> {

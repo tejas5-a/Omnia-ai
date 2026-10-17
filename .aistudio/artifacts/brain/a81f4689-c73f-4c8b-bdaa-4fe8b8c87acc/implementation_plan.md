@@ -1,148 +1,116 @@
-# MAX AUTOMATIONS — Ultimate Cross-App Automation System
+# Implementation Plan — OMNIA MAX: Attachment Navigation, MAX Automations Repair & Scheduled Messaging
 
-Upgrade OMNIA MAX with **MAX AUTOMATIONS**, a production-oriented cross-app automation platform allowing users to create, schedule, customize, and execute multi-step workflows across popular Android applications (WhatsApp, Instagram, YouTube, Telegram, X, Facebook, Gmail, Chrome, Spotify) and external integrations, wrapped in OMNIA MAX's signature sci-fi UI identity.
-
-> [!IMPORTANT]
-> **Strict AI Assistant Removal Preservation**: As mandated, the AI assistant functionality remains completely removed. MAX AUTOMATIONS is purely a deterministic, user-controlled cross-app workflow automation engine using Android intents, deep links, share sheet delegates, background scheduling, webhooks, and official APIs.
-
----
+Comprehensive architecture and implementation plan for resolving attachment picker state resets, adding granular action deletion with Undo in MAX Automations, and implementing Scheduled Messaging with recipient selection and notification triggers in **OMNIA MAX**.
 
 ## User Review & Critical Decisions
 
-- **Confirmed Decision 1 (Triggers)**: Hybrid trigger execution model supporting **Manual execution**, **Scheduled time/date**, **System events** (battery, connectivity), and **Webhooks**.
-- **Confirmed Decision 2 (App Integrations)**: Direct app actions via Android Intents, Deep Links, and Android Share Sheet as default; official APIs as advanced options; explicit user confirmation as safeguard for consequential actions.
-- **Confirmed Decision 3 (Dashboard Aesthetic)**: OMNIA MAX sci-fi dark posture (deep navy `#0B0F19`, glass cards with subtle glowing borders, cyan `#00F2FE` and electric violet `#7F00FF` accents).
+> [!IMPORTANT]
+> The following decisions were confirmed by the user during Phase 1 clarification:
+
+- **Confirmed Decision 1 (Scheduled Message Delivery)**: Scheduled messages for social/messaging apps (WhatsApp, Telegram, Instagram, X) will trigger a high-priority system notification at the scheduled time. Tapping the notification opens the target app with pre-filled recipient and content for 1-tap manual confirmation.
+- **Confirmed Decision 2 (Action Deletion & Undo)**: Individual action steps in MAX Automations can be deleted directly with a trash icon beside each action step. The list order and persistence update immediately with a 5-second Undo snackbar.
+- **Confirmed Decision 3 (Scheduled Messages Screen)**: A dedicated **Scheduled Messages** manager screen will be housed inside the MAX Automations dashboard with options to review, edit, cancel, retry, or delete scheduled messages.
 
 ---
 
 ## 1. Overview & Core Concept
 
-**MAX AUTOMATIONS** delivers cross-app automation for Android power users:
-- **Visual Workflow Builder**: Structured `WHEN -> IF -> THEN -> REVIEW -> SAVE` flow for creating deterministic rules.
-- **Universal App Integrations**: Native Intent handlers, deep-link triggers, share sheet preparers, and official API integration adapters for WhatsApp, YouTube, Telegram, Instagram, X, Facebook, Gmail, Chrome, Spotify, and generic Android apps.
-- **Robust Background Execution**: Time-zone aware scheduling via `WorkManager` and `AlarmManager` with Doze-mode compatibility and idempotency execution tracking.
-- **Integrations & Webhook Center**: Configuration hub for Webhook endpoints, OAuth tokens, and API credential management.
+This update resolves three primary operational issues in OMNIA MAX while maintaining the app's premium dark aesthetic and existing multi-provider AI chat capabilities:
+
+1. **Attachment Navigation Fix**: Fixes unexpected resets to the home screen when selecting images/documents by isolating `ActivityResultLauncher` contracts (`PickVisualMedia`, `OpenDocument`), preserving Compose state, and enforcing persistent `"chat"` screen navigation.
+2. **MAX Automations Action Management**: Enhances the visual workflow builder with per-action trash buttons, immediate state persistence, reordering, and a 5-second Undo snackbar.
+3. **Scheduled Messaging Engine**: Provides a complete message scheduling subsystem supporting date/time pickers, contact picker integration (`PickContact`), app selection, Android `AlarmManager` / `WorkManager` scheduling, and delivery status tracking (`SCHEDULED`, `AWAITING_USER_ACTION`, `SENT`, `FAILED`, `CANCELLED`).
 
 ---
 
 ## 2. User Experience & Visual Design
 
-### Dashboard Layout & Navigation
-- **Header Stat Cards**: Total Automations, Active/Paused count, Execution Success Rate, Last Triggered timestamp.
-- **Filter & Search Bar**: Search by workflow name, filter by status (`All`, `Active`, `Scheduled`, `Paused`) or target app (`WhatsApp`, `YouTube`, `Telegram`, etc.), and sort by date or execution count.
-- **Workflow Cards**: Glassmorphism cards featuring app icons, trigger badge, action chain overview, enabled toggle switch, execution status pill, and quick action menu (`Edit`, `Run Now`, `Duplicate`, `Export`, `Delete`).
-- **Template Gallery**: Pre-built one-tap templates (Daily Reminder, YouTube Routine, Study Focus, Social Share, Prepared Email Draft, Webhook Bridge).
+### Key User Flows
 
-### Visual Workflow Builder (`WHEN -> IF -> THEN -> REVIEW -> SAVE`)
 ```
-┌────────────────────────────────────────────────────────────────────────┐
-│                        VISUAL WORKFLOW BUILDER                        │
-├───────────────┬───────────────┬───────────────┬───────────────┬────────┤
-│    1. WHEN    │    2. IF      │    3. THEN    │   4. REVIEW   │ 5. SAVE│
-│   (Trigger)   │  (Condition)  │   (Actions)   │   (Confirm)   │ (Done) │
-└───────┬───────┴───────┬───────┴───────┬───────┴───────┬───────┴────────┘
-        │               │               │               │
-        ▼               ▼               ▼               ▼
-┌──────────────┐┌──────────────┐┌──────────────┐┌──────────────┐
-│• Manual Tap  ││• Time/Day    ││• Open App    ││• Permission  │
-│• Scheduled   ││• Battery %   ││• Deep Link   ││  Validation │
-│• System Event││• Wi-Fi State ││• Share Text  ││• Safeguard   │
-│• Webhook     ││• App State   ││• Compose Msg ││  Prompt Check│
-└──────────────┘└──────────────┘└──────────────┘└──────────────┘
+[Main Chat Screen]
+  ├── Tap Attachment Icon -> System File/Image Picker -> Return to Chat (No Home Screen Reset!)
+  └── Attachment Preview Card rendered above Composer with processing badge
+
+[MAX Automations Dashboard]
+  ├── Action Steps List -> Tap Trash Icon beside individual step -> Immediate removal + Undo Snackbar
+  ├── Tap "Delete Workflow" -> Confirmation Dialog -> Workflow deleted from Room DB
+  └── Tap "Scheduled Messages" -> Open Scheduled Messages Management Screen
+
+[Scheduled Messages Screen]
+  ├── Floating Action Button (+) -> Schedule New Message Dialog
+  │     ├── Select App (WhatsApp, Telegram, Instagram, X, Gmail)
+  │     ├── Select Recipient (System Contact Picker or Manual Input)
+  │     ├── Set Date & Time (DatePicker & TimePicker)
+  │     └── Enter Message Content
+  └── Review Scheduled Item Cards (Status, App Icon, Recipient, Time) -> Actions: Edit / Cancel / Retry / Delete
 ```
+
+### Visual Identity & Theme
+- **Surface Palette**: `#121212` main background, `#171B27` secondary, `#202635` cards, `#282F40` elevated surfaces.
+- **Accents**: `#3478F6` primary blue, `#60A5FA` secondary cyan, `#34D399` success green, `#F87171` error red, `#F59E0B` warning amber.
+- **Typography**: Clean `sp` scaled Material 3 typography with bold header hierarchy and monospace code snippets.
 
 ---
 
-## 3. Technical Architecture & Component Hierarchy
+## 3. Key Product Decisions & Trade-Offs
 
-```
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                           UI LAYER (Jetpack Compose)                            │
-├───────────────────────────────┬─────────────────────────────────────────────────┤
-│ AutomationsDashboardScreen    │ VisualWorkflowBuilderScreen                     │
-│ IntegrationsCenterScreen      │ ExecutionHistoryScreen                          │
-└───────────────┬───────────────┴────────────────────────┬────────────────────────┘
-                │                                        │
-                ▼                                        ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                          VIEWMODEL & ENGINE LAYER                               │
-├───────────────────────────────┬─────────────────────────────────────────────────┤
-│ AutomationsViewModel          │ AutomationExecutionEngine                       │
-│ TriggerRegistry               │ ConditionEvaluator                              │
-│ ActionRegistry                │ AppIntegrationFramework                         │
-└───────────────┬───────────────┴────────────────────────┬────────────────────────┘
-                │                                        │
-                ▼                                        ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                    PERSISTENCE & SCHEDULING DATA LAYER                          │
-├───────────────────────────────┬─────────────────────────────────────────────────┤
-│ Room AppDatabase (Workflows)  │ WorkManager Scheduler                           │
-│ SecurePreferencesManager      │ Intent & DeepLink Dispatcher                    │
-└───────────────────────────────┴─────────────────────────────────────────────────┘
-```
+### Decision 1: Attachment Picker Navigation Isolation
+- **Chosen Approach**: Retain Compose state using `rememberSaveable` and ensure `appPrefs.updateLastScreen("chat")` is called whenever `ChatScreen` is mounted, so Activity lifecycle pauses caused by system file pickers do not cause `MainActivity` to re-evaluate `lastScreen` as `"home"`.
+- **Why**: Eliminates the jarring jump to the home screen when selecting attachments.
 
-### Data Models & Room Schema
-
-1. **`AutomationEntity`** (`automations` table):
-   - `id`: String (UUID)
-   - `name`: String
-   - `description`: String
-   - `isEnabled`: Boolean
-   - `triggerJson`: String (Serialized `AutomationTrigger`)
-   - `conditionsJson`: String (Serialized `List<AutomationCondition>`)
-   - `actionsJson`: String (Serialized `List<AutomationAction>`)
-   - `targetApp`: String (WhatsApp, YouTube, Telegram, Spotify, etc.)
-   - `createdAt`: Long
-   - `lastRunAt`: Long
-   - `lastRunStatus`: String (`SUCCESS`, `FAILED`, `SKIPPED`, `WAITING_FOR_USER`, `PERMISSION_REQUIRED`)
-   - `runCount`: Int
-
-2. **`AutomationRunLogEntity`** (`automation_run_logs` table):
-   - `id`: String
-   - `automationId`: String
-   - `automationName`: String
-   - `status`: String
-   - `executionSummary`: String
-   - `timestamp`: Long
+### Decision 2: Scheduled Delivery via AlarmManager + Notifications
+- **Chosen Approach**: Use Android `AlarmManager` (`setExactAndAllowWhileIdle`) + `BroadcastReceiver` + System Notification for exact timing across app/device restarts. When alarm triggers, a notification is posted. Tapping the notification launches the target app's intent with pre-filled recipient and text.
+- **Why**: Modern Android OS restrictions prohibit third-party apps from sending messages silently in background for apps like WhatsApp/Instagram. Pre-filling and prompting the user satisfies Android security policies while delivering 1-tap dispatch.
 
 ---
 
-## 4. Universal App Integration Matrix
+## 4. Technical Architecture & Data Strategy
 
-| Target Application | Trigger Capabilities | Action Capabilities & System Mechanics | Safeguards & Limitations |
-| :--- | :--- | :--- | :--- |
-| **WhatsApp** | Manual, Scheduled, Webhook | Open Chat Link, Prepare Message, Share Text/Media via Intent | Requires user confirmation to tap Send in WhatsApp. |
-| **YouTube** | Manual, Scheduled Time | Open Video URL, Open Playlist, Watch Later Reminder | Launches official YouTube app/URL. Respects playback limits. |
-| **Telegram** | Manual, Scheduled, Webhook | Open Channel/Chat, Share Text, Official Bot API sendMessage | Tokens stored in SecurePreferencesManager. |
-| **Instagram** | Manual, Scheduled | Open Profile/Reel, Share to Feed/Stories via Share Sheet | Media prepped via Share Sheet. |
-| **X (Twitter)** | Manual, Scheduled, Webhook | Open Profile/Post, Compose Tweet Intent, Share Sheet | Intent opens compose box. |
-| **Facebook** | Manual, Scheduled | Open Page/Group, Share Content via Intent | Uses Android Intent delegates. |
-| **Gmail** | Manual, Scheduled | Compose Draft (`ACTION_SENDTO` / `ACTION_SEND`), Subject & Body | User reviews and sends in Gmail. |
-| **Chrome / Web** | Manual, Scheduled, Webhook | Open Validated URL, Webhook Endpoint Receiver | URL scheme validation (HTTPS/HTTP). |
-| **Spotify** | Manual, Scheduled | Open Track/Album/Playlist Deep Link (`spotify:track:...`) | Deep link opens Spotify. |
-| **Generic Apps** | Manual, Scheduled | Package Launch Intent, Share Sheet, In-App Screen | Checks package installation status first. |
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            UI LAYER (JETPACK COMPOSE)                       │
+├──────────────────────────────┬───────────────────────────────┬──────────────┤
+│          ChatScreen          │    AutomationsDashboardScreen │ Scheduled    │
+│    (Inline Attachments)      │  (Workflow & Action Builder)  │ Messages UI  │
+└──────────────┬───────────────┴───────────────┬───────────────┴──────┬───────┘
+               │                               │                      │
+               ▼                               ▼                      ▼
+┌──────────────────────────────┬──────────────────────────────────────────────┐
+│       ChatViewModel          │             AutomationsViewModel             │
+└──────────────┬───────────────┴───────────────────────┬──────────────────────┘
+               │                                       │
+               ▼                                       ▼
+┌──────────────────────────────┬──────────────────────────────────────────────┐
+│        ChatRepository        │             AutomationRepository             │
+├──────────────────────────────┴──────────────────────────────────────────────┤
+│                             ROOM DATABASE (SQLITE)                          │
+│   chat_threads | chat_messages | automations | scheduled_messages | logs    │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                       │
+                                       ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      ANDROID SYSTEM SERVICE INTEGRATION                     │
+│    AlarmManager | BroadcastReceiver | ContactPicker | StorageAccessFramework│
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### New / Updated Data Entities
+
+1. **`ScheduledMessageEntity` (Room Database)**:
+   - `id: String` (UUID)
+   - `targetApp: String` (WHATSAPP, TELEGRAM, INSTAGRAM, X, GMAIL, etc.)
+   - `recipientName: String`
+   - `recipientContactInfo: String` (Phone number / handle / email)
+   - `messageContent: String`
+   - `scheduledEpochMs: Long`
+   - `status: String` (`SCHEDULED`, `AWAITING_USER_ACTION`, `SENT`, `FAILED`, `CANCELLED`)
+   - `createdAt: Long`
+
+2. **`ScheduledMessageDao`**:
+   - `getAllScheduledMessages(): Flow<List<ScheduledMessageEntity>>`
+   - `insertScheduledMessage(item: ScheduledMessageEntity)`
+   - `updateStatus(id: String, status: String)`
+   - `deleteScheduledMessage(id: String)`
 
 ---
-
-## 5. Implementation Phasing & Milestones
-
-1. **Phase 1: Architecture & Data Layer**:
-   - Create models (`AutomationModels.kt`, `AutomationEntity`, `AutomationRunLogEntity`).
-   - Add DAO and Room database migration.
-   - Implement `AutomationRepository`.
-
-2. **Phase 2: App Integration Handlers**:
-   - Create `AppIntegrationFramework.kt` and individual integration drivers (`WhatsAppDriver`, `YouTubeDriver`, `TelegramDriver`, `GmailDriver`, etc.).
-   - Package visibility checks (`packageManager.getLaunchIntentForPackage`).
-
-3. **Phase 3: Execution Engine & Scheduler**:
-   - Create `AutomationExecutionEngine.kt`, `ConditionEvaluator.kt`, and `WorkManager` scheduler task.
-   - Implement idempotency checks and execution log reporting.
-
-4. **Phase 4: Dashboard & Visual Builder UI**:
-   - Implement `AutomationsDashboardScreen.kt`, `VisualWorkflowBuilderScreen.kt`, and `IntegrationsCenterScreen.kt`.
-   - Add template gallery and JSON export/import handlers.
-
-5. **Phase 5: Navigation & MainActivity Integration**:
-   - Add `Automations` to sidebar drawer (`DrawerContent.kt`) and `MainActivity` routes.
-   - Run compilation checks (`compile_applet`).

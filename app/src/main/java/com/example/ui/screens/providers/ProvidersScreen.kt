@@ -63,6 +63,35 @@ fun ProvidersScreen(
                 .imePadding()
                 .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
+            // Multi-Provider Architecture Banner
+            Surface(
+                color = OmniaElevatedSurface,
+                shape = RoundedCornerShape(14.dp),
+                border = androidx.compose.foundation.BorderStroke(1.dp, OmniaElectricBlue.copy(alpha = 0.5f)),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 12.dp)
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Tune, contentDescription = null, tint = OmniaNeonCyan, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Independent Multi-Provider Activation",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp,
+                            color = OmniaTextPrimary
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Enable multiple providers simultaneously. OMNIA MAX automatically routes text/coding prompts to OpenRouter and image generation to Pollinations AI.",
+                        fontSize = 12.sp,
+                        color = OmniaTextSecondary
+                    )
+                }
+            }
+
             // Free Models Only Filter Card
             Surface(
                 color = OmniaCardBg,

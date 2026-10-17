@@ -35,7 +35,7 @@ class ChatViewModel(
 
     private var generationJob: Job? = null
     private var messageObserverJob: Job? = null
-    private val llmManager = LLMProviderManager { providerRepository.getActiveProvider() }
+    private val llmManager = LLMProviderManager(providerRepository)
 
     init {
         viewModelScope.launch {

@@ -136,15 +136,14 @@ class ProvidersViewModel(
 
     fun toggleProviderEnabled(provider: ProviderConfig, enabled: Boolean) {
         viewModelScope.launch {
-            if (enabled) {
-                _uiState.value.providers.forEach { p ->
-                    providerRepository.saveProvider(p.copy(enabled = p.id == provider.id))
-                }
+            val updated = provider.copy(enabled = enabled)
+            providerRepository.saveProvider(updated)
+            if (enabled && provider.type != com.example.data.model.ProviderType.POLLINATIONS) {
                 appPrefs.updateActiveProviderId(provider.id)
                 appPrefs.updateSelectedModelId(provider.selectedModel)
-            } else {
-                providerRepository.saveProvider(provider.copy(enabled = false))
             }
+            val stateMsg = if (enabled) "${provider.name} is now Enabled." else "${provider.name} is now Disabled."
+            _uiState.update { it.copy(statusMessage = stateMsg, errorMessage = null) }
         }
     }
 
